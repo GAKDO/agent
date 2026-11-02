@@ -19,19 +19,19 @@
 - [x] T007 [P] [US1] `tests/test_report.py`: 스키마 통과, 컴퓨터 이름·UUID가 JSON에 없다, 요약에 sources
 - [x] T008 [US1] `src/trace_agent/macos.py`: 파서(순수 함수)와 `collect(run)`
 - [x] T009 [US1] `src/trace_agent/report.py`: 조립·검증·요약
-- [ ] T010 [US1] `src/trace_agent/__main__.py`: `trace-agent collect [--out 파일]` (PR 2)
+- [x] T010 [US1] `src/trace_agent/__main__.py`: `trace-agent run [--code] [--out 파일]` (PR 2, 코드 없이 실행하면 미리보기만)
 
 ## Phase 4: 스토리 2 - 전원이 있을 때만 벤치마크 (PR 2)
 
-- [ ] T011 [P] [US2] `tests/test_benchmark.py`: 전원 없으면 실행 0회 + NO_AC_POWER, 있으면 5종 × 3회 + 가운데 값
-- [ ] T012 [US2] `src/trace_agent/benchmark.py`
+- [x] T011 [P] [US2] `tests/test_benchmark.py`: 전원 없으면 실행 0회 + NO_AC_POWER, 있으면 5종 × 3회 + 가운데 값
+- [x] T012 [US2] `src/trace_agent/benchmark.py`
 
 ## Phase 5: 스토리 3 - 동의한 뒤에만 올린다 (PR 2)
 
-- [ ] T013 [P] [US3] `tests/test_upload.py`: y 아니면 요청 0회, y면 교환 → 업로드(Idempotency-Key, consentedAt), 422·409는 code 표시·파일 남김
-- [ ] T014 [US3] `src/trace_agent/upload.py`, `trace-agent run --code`
+- [x] T013 [P] [US3] `tests/test_upload.py`: y 아니면 요청 0회, y면 교환 → 업로드(Idempotency-Key, consentedAt), 422·409는 code 표시·파일 남김
+- [x] T014 [US3] `src/trace_agent/upload.py`, `trace-agent run --code`
 
 ## Phase 6: 마무리
 
-- [ ] T015 `README.md`: 설치·실행·읽는 명령 목록
+- [x] T015 `README.md`: 설치·실행·읽는 명령 목록
 - [ ] T016 팀 노트북 3대에서 실행, DI1 뒤 저장 확인
