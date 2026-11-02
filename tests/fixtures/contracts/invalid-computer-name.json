@@ -1,0 +1,148 @@
+{
+  "schemaVersion": "diag.v1",
+  "agentVersion": "0.1.0",
+  "collectedAt": "2026-11-06T14:03:22+09:00",
+  "consentedAt": "2026-11-06T14:04:10+09:00",
+  "os": {
+    "type": "MACOS",
+    "version": "15.1",
+    "arch": "arm64"
+  },
+  "device": {
+    "serial": "C02TEST00001",
+    "manufacturer": "Apple",
+    "model": "Mac14,2",
+    "modelName": "MacBook Air (M2, 2022)",
+    "computerName": "MINSEO-MacBook-Air"
+  },
+  "conditions": {
+    "acPower": true,
+    "batteryPercent": 92,
+    "thermalState": "NOMINAL",
+    "processCount": 312,
+    "uptimeSec": 5400
+  },
+  "components": [
+    {
+      "kind": "CPU",
+      "identifier": "Apple M2",
+      "detail": {
+        "cores": 8
+      }
+    },
+    {
+      "kind": "RAM",
+      "identifier": "8 GB",
+      "detail": {
+        "totalBytes": 8589934592
+      }
+    },
+    {
+      "kind": "SSD",
+      "identifier": "APPLE SSD AP0256Z",
+      "detail": {
+        "serial": "SSDTEST01",
+        "capacityBytes": 251000193024
+      }
+    },
+    {
+      "kind": "BATTERY",
+      "identifier": "bq40z651",
+      "detail": {
+        "serial": "BATTEST01"
+      }
+    },
+    {
+      "kind": "DISPLAY",
+      "identifier": "Built-in Liquid Retina",
+      "detail": {
+        "resolution": "2560x1664"
+      }
+    }
+  ],
+  "battery": {
+    "status": "OK",
+    "skippedReason": null,
+    "cycleCount": 214,
+    "designCapacity": {
+      "value": 4382,
+      "unit": "mAh"
+    },
+    "fullChargeCapacity": {
+      "value": 3901,
+      "unit": "mAh"
+    },
+    "osMaxCapacityPercent": 89,
+    "osCondition": "NORMAL"
+  },
+  "storage": {
+    "status": "OK",
+    "skippedReason": null,
+    "protocol": "NVME",
+    "percentageUsed": 3,
+    "availableSpare": 100,
+    "criticalWarning": 0,
+    "mediaErrors": 0,
+    "powerOnHours": 812
+  },
+  "benchmarks": [
+    {
+      "metric": "CPU_SINGLE",
+      "unit": "ops/s",
+      "trials": [
+        1021.3,
+        1018.9,
+        1025.0
+      ],
+      "median": 1021.3
+    },
+    {
+      "metric": "CPU_MULTI",
+      "unit": "ops/s",
+      "trials": [
+        6120.4,
+        6088.1,
+        6131.7
+      ],
+      "median": 6120.4
+    },
+    {
+      "metric": "MEM_COPY",
+      "unit": "MB/s",
+      "trials": [
+        41200,
+        40950,
+        41380
+      ],
+      "median": 41200
+    },
+    {
+      "metric": "DISK_READ",
+      "unit": "MB/s",
+      "trials": [
+        2810,
+        2795,
+        2830
+      ],
+      "median": 2810
+    },
+    {
+      "metric": "DISK_WRITE",
+      "unit": "MB/s",
+      "trials": [
+        2105,
+        2090,
+        2118
+      ],
+      "median": 2105
+    }
+  ],
+  "benchmarkSkippedReason": null,
+  "sources": [
+    "system_profiler SPHardwareDataType -json",
+    "system_profiler SPPowerDataType -json",
+    "ioreg -r -c AppleSmartBattery",
+    "smartctl -j -a disk0",
+    "trace-bench 0.1.0"
+  ]
+}

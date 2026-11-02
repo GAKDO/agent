@@ -1,0 +1,19 @@
+{
+  "SPHardwareDataType" : [
+    {
+      "_name" : "hardware_overview",
+      "activation_lock_status" : "activation_lock_disabled",
+      "boot_rom_version" : "18000.120.36",
+      "chip_type" : "Apple M2",
+      "machine_model" : "Mac14,2",
+      "machine_name" : "MacBook Air",
+      "model_number" : "Z16000021KH/A",
+      "number_processors" : "proc 8:4:4:0",
+      "os_loader_version" : "18000.120.36",
+      "physical_memory" : "16 GB",
+      "platform_UUID" : "00000000-0000-0000-0000-000000000000",
+      "provisioning_UDID" : "00000000-0000-0000-0000-000000000000",
+      "serial_number" : "C02TEST00001"
+    }
+  ]
+}
