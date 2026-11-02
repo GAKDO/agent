@@ -1,0 +1,28 @@
+{
+  "SPNVMeDataType" : [
+    {
+      "_items" : [
+        {
+          "_name" : "APPLE SSD AP0256Z",
+          "bsd_name" : "disk0",
+          "detachable_drive" : "no",
+          "device_model" : "APPLE SSD AP0256Z",
+          "device_revision" : "561.100.",
+          "device_serial" : "SSDTEST01",
+          "partition_map_type" : "guid_partition_map_type",
+          "removable_media" : "no",
+          "size" : "251 GB",
+          "size_in_bytes" : 251000193024,
+          "smart_status" : "Verified",
+          "spnvme_trim_support" : "Yes",
+          "volumes" : [
+            {"_name" : "iSCPreboot", "bsd_name" : "disk0s1", "iocontent" : "Apple_APFS_ISC", "size" : "524.3 MB", "size_in_bytes" : 524288000},
+            {"_name" : "Macintosh HD - Data", "bsd_name" : "disk0s2", "iocontent" : "Apple_APFS", "size" : "245.11 GB", "size_in_bytes" : 245107195904},
+            {"_name" : "Recovery", "bsd_name" : "disk0s3", "iocontent" : "Apple_APFS_Recovery", "size" : "5.37 GB", "size_in_bytes" : 5368664064}
+          ]
+        }
+      ],
+      "_name" : "Apple SSD Controller"
+    }
+  ]
+}

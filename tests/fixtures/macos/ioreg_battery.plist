@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>AppleRawCurrentCapacity</key>
+		<integer>2231</integer>
+		<key>AppleRawExternalConnected</key>
+		<false/>
+		<key>AppleRawMaxCapacity</key>
+		<integer>3943</integer>
+		<key>BatteryData</key>
+		<dict>
+			<key>CycleCount</key>
+			<integer>186</integer>
+			<key>DesignCapacity</key>
+			<integer>4563</integer>
+			<key>MaxCapacity</key>
+			<integer>100</integer>
+			<key>Serial</key>
+			<string>BATTEST01</string>
+			<key>StateOfCharge</key>
+			<integer>57</integer>
+		</dict>
+		<key>BatteryInstalled</key>
+		<true/>
+		<key>CurrentCapacity</key>
+		<integer>59</integer>
+		<key>CycleCount</key>
+		<integer>186</integer>
+		<key>DesignCapacity</key>
+		<integer>4563</integer>
+		<key>DesignCycleCount9C</key>
+		<integer>1000</integer>
+		<key>DeviceName</key>
+		<string>bq40z651</string>
+		<key>ExternalConnected</key>
+		<false/>
+		<key>FullyCharged</key>
+		<false/>
+		<key>IsCharging</key>
+		<false/>
+		<key>MaxCapacity</key>
+		<integer>100</integer>
+		<key>NominalChargeCapacity</key>
+		<integer>4070</integer>
+		<key>Serial</key>
+		<string>BATTEST01</string>
+		<key>Temperature</key>
+		<integer>2993</integer>
+		<key>built-in</key>
+		<true/>
+	</dict>
+</array>
+</plist>

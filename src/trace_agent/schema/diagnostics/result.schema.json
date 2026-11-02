@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TRACE 진단 결과 JSON v1",
+  "description": "진단 에이전트가 사용자 동의 뒤 POST /api/v1/diagnostics/runs로 올리는 본문 (C2, FR-DIA-01~05). 원본 초안은 GAKDO/docs design/diagnostics-json-v0.md. 시점(checkpointId)은 본문에 없고 AGENT 토큰에서 서버가 읽는다. 읽지 못한 값은 0이 아니라 null이고 생략 사유를 함께 둔다(헌법 III). 컴퓨터 이름·사용자 이름은 보내지 않는다(헌법 V): 정해진 필드 밖의 키는 모두 거부한다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "agentVersion",
+    "collectedAt",
+    "consentedAt",
+    "os",
+    "device",
+    "conditions",
+    "components",
+    "battery",
+    "storage",
+    "benchmarks",
+    "benchmarkSkippedReason",
+    "sources"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "diag.v1",
+      "description": "이 스키마의 버전. 더하는 변경은 같은 값을 쓰고, 깨지는 변경이면 새 값과 새 파일을 만든다."
+    },
+    "agentVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "description": "에이전트 버전 → diagnostic_run.agent_version"
+    },
+    "collectedAt": {
+      "$ref": "#/$defs/DiagDateTime",
+      "description": "측정을 마친 시각"
+    },
+    "consentedAt": {
+      "$ref": "#/$defs/DiagDateTime",
+      "description": "사용자가 결과를 본 뒤 올리기에 동의한 시각(FR-DIA-05) → diagnostic_run.consented_at"
+    },
+    "os": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "version", "arch"],
+      "properties": {
+        "type": { "$ref": "../schemas/codes.gen.schema.json#/$defs/DeviceOs" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 32, "description": "예: 15.1, 10.0.22631" },
+        "arch": { "type": "string", "minLength": 1, "maxLength": 16, "description": "예: arm64, x86_64, AMD64" }
+      }
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["serial", "manufacturer", "model", "modelName"],
+      "description": "기기 식별. 서버는 serial을 렌탈 기기 시리얼과 대조해 다르면 422 DEVICE_SERIAL_MISMATCH. 컴퓨터 이름·사용자 이름·플랫폼 UUID는 넣지 않는다.",
+      "properties": {
+        "serial": { "type": "string", "minLength": 1, "maxLength": 64, "description": "기기 시리얼 → diagnostic_run.device_serial" },
+        "manufacturer": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 64, "description": "모델 식별자(예: Mac14,2)" },
+        "modelName": { "type": ["string", "null"], "maxLength": 128, "description": "사람이 읽는 모델 이름, 모르면 null" }
+      }
+    },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["acPower", "batteryPercent", "thermalState", "processCount", "uptimeSec"],
+      "description": "측정 조건(FR-DIA-04) → diagnostic_run.conditions",
+      "properties": {
+        "acPower": { "type": "boolean", "description": "전원 연결 여부. false면 벤치마크를 돌리지 않는다." },
+        "batteryPercent": { "type": ["integer", "null"], "minimum": 0, "maximum": 100, "description": "측정 시작 때 배터리 잔량 %, 배터리가 없거나 못 읽으면 null" },
+        "thermalState": {
+          "oneOf": [
+            { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsThermalState" },
+            { "type": "null" }
+          ],
+          "description": "발열 상태(macOS). Windows는 null"
+        },
+        "processCount": { "type": ["integer", "null"], "minimum": 1, "description": "측정 시작 때 실행 중인 프로세스 수" },
+        "uptimeSec": { "type": ["integer", "null"], "minimum": 0, "description": "부팅 뒤 지난 초" }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "description": "부품 구성(FR-DIA-01) → hardware_component. 시점 사이 부품 변경(COMPONENT_CHANGED) 비교에 쓴다.",
+      "items": { "$ref": "#/$defs/Component" }
+    },
+    "battery": { "$ref": "#/$defs/Battery" },
+    "storage": { "$ref": "#/$defs/Storage" },
+    "benchmarks": {
+      "type": "array",
+      "maxItems": 5,
+      "description": "고정 벤치마크 결과(FR-DIA-04) → benchmark_result. 지표마다 하나. 돌리지 못했으면 빈 배열과 benchmarkSkippedReason.",
+      "items": { "$ref": "#/$defs/Benchmark" }
+    },
+    "benchmarkSkippedReason": {
+      "oneOf": [
+        { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsSkippedReason" },
+        { "type": "null" }
+      ],
+      "description": "벤치마크를 돌리지 못한 이유. 돌렸으면 null. 전원이 연결되지 않았으면 NO_AC_POWER."
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "description": "실행한 명령 목록(NFR-02 고정 목록에서). 원본 JSON에만 남는다.",
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    }
+  },
+  "allOf": [
+    {
+      "description": "전원이 연결되지 않으면 벤치마크를 돌리지 않는다: 빈 배열 + NO_AC_POWER",
+      "if": { "properties": { "conditions": { "properties": { "acPower": { "const": false } } } } },
+      "then": { "properties": { "benchmarks": { "maxItems": 0 }, "benchmarkSkippedReason": { "const": "NO_AC_POWER" } } }
+    },
+    {
+      "description": "벤치마크가 비었으면 사유가 있고, 있으면 사유는 null",
+      "if": { "properties": { "benchmarks": { "maxItems": 0 } } },
+      "then": { "properties": { "benchmarkSkippedReason": { "type": "string" } } },
+      "else": { "properties": { "benchmarkSkippedReason": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "DiagDateTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$",
+      "description": "ISO 8601 + 오프셋(예: 2026-11-06T14:03:22+09:00)"
+    },
+    "Capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit"],
+      "description": "배터리 용량. 값과 단위를 함께 보내고 환산하지 않는다(macOS mAh, Windows mWh). 0은 '모름'으로 쓰지 않는다: 모르면 이 객체 대신 null.",
+      "properties": {
+        "value": { "type": "integer", "minimum": 1 },
+        "unit": { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsCapacityUnit" }
+      }
+    },
+    "NullableCapacity": {
+      "oneOf": [{ "$ref": "#/$defs/Capacity" }, { "type": "null" }]
+    },
+    "Component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "identifier", "detail"],
+      "properties": {
+        "kind": { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsComponentKind" },
+        "identifier": { "type": "string", "minLength": 1, "maxLength": 128, "description": "모델명(예: Apple M2, APPLE SSD AP0256Z)" },
+        "detail": {
+          "type": "object",
+          "maxProperties": 16,
+          "description": "부품별 부가 값(코어 수·용량·부품 시리얼·해상도 등). 값은 글자·숫자·참거짓·null만. 컴퓨터·사용자·소유자·계정·이메일을 뜻하는 키는 거부한다.",
+          "propertyNames": {
+            "pattern": "^[a-z][A-Za-z0-9]{0,39}$",
+            "not": { "pattern": "[Hh]ost|[Cc]omputer|[Uu]ser|[Oo]wner|[Aa]ccount|[Ee]mail|[Uu]uid" }
+          },
+          "additionalProperties": {
+            "type": ["string", "number", "integer", "boolean", "null"],
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "Battery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "skippedReason",
+        "cycleCount",
+        "designCapacity",
+        "fullChargeCapacity",
+        "osMaxCapacityPercent",
+        "osCondition"
+      ],
+      "description": "배터리(FR-DIA-02) → battery_reading. 효율 %(완충 ÷ 설계 × 100)는 서버가 계산한다.",
+      "properties": {
+        "status": { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsBatteryStatus" },
+        "skippedReason": {
+          "oneOf": [
+            { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsSkippedReason" },
+            { "type": "null" }
+          ]
+        },
+        "cycleCount": { "type": ["integer", "null"], "minimum": 1, "description": "충전 사이클. OS가 0을 주면 '모름'이므로 null" },
+        "designCapacity": { "$ref": "#/$defs/NullableCapacity" },
+        "fullChargeCapacity": { "$ref": "#/$defs/NullableCapacity" },
+        "osMaxCapacityPercent": { "type": ["integer", "null"], "minimum": 0, "maximum": 200, "description": "OS가 보여 주는 최대 용량 %(macOS), 없으면 null" },
+        "osCondition": {
+          "oneOf": [
+            { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsBatteryCondition" },
+            { "type": "null" }
+          ],
+          "description": "OS 판정(macOS). Windows는 null"
+        }
+      },
+      "allOf": [
+        {
+          "description": "OK면 사유는 null이고 두 용량을 읽었다",
+          "if": { "properties": { "status": { "const": "OK" } } },
+          "then": {
+            "properties": {
+              "skippedReason": { "type": "null" },
+              "designCapacity": { "$ref": "#/$defs/Capacity" },
+              "fullChargeCapacity": { "$ref": "#/$defs/Capacity" }
+            }
+          }
+        },
+        {
+          "description": "SKIPPED면 사유가 있고 값은 모두 null",
+          "if": { "properties": { "status": { "const": "SKIPPED" } } },
+          "then": { "$ref": "#/$defs/BatteryAllNull", "properties": { "skippedReason": { "enum": ["NO_PERMISSION", "UNSUPPORTED", "TOOL_ERROR"] } } }
+        },
+        {
+          "description": "NO_BATTERY면 사유도 값도 null",
+          "if": { "properties": { "status": { "const": "NO_BATTERY" } } },
+          "then": { "$ref": "#/$defs/BatteryAllNull", "properties": { "skippedReason": { "type": "null" } } }
+        }
+      ]
+    },
+    "BatteryAllNull": {
+      "properties": {
+        "cycleCount": { "type": "null" },
+        "designCapacity": { "type": "null" },
+        "fullChargeCapacity": { "type": "null" },
+        "osMaxCapacityPercent": { "type": "null" },
+        "osCondition": { "type": "null" }
+      }
+    },
+    "Storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "skippedReason",
+        "protocol",
+        "percentageUsed",
+        "availableSpare",
+        "criticalWarning",
+        "mediaErrors",
+        "powerOnHours"
+      ],
+      "description": "SSD 상태(FR-DIA-03) → ssd_health. 사용률 하나로 판단하지 않도록 값을 따로 둔다. 권한이 없으면 SKIPPED + 사유, 값은 모두 null.",
+      "properties": {
+        "status": { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsStorageStatus" },
+        "skippedReason": {
+          "oneOf": [
+            { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsSkippedReason" },
+            { "type": "null" }
+          ]
+        },
+        "protocol": {
+          "oneOf": [
+            { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsStorageProtocol" },
+            { "type": "null" }
+          ]
+        },
+        "percentageUsed": { "type": ["integer", "null"], "minimum": 0, "maximum": 255, "description": "NVMe percentage_used. 100을 넘을 수 있다" },
+        "availableSpare": { "type": ["integer", "null"], "minimum": 0, "maximum": 100, "description": "예비 블록 %" },
+        "criticalWarning": { "type": ["integer", "null"], "minimum": 0, "maximum": 255, "description": "NVMe 경고 바이트. 0이 아니면 고장 신호" },
+        "mediaErrors": { "type": ["integer", "null"], "minimum": 0 },
+        "powerOnHours": { "type": ["integer", "null"], "minimum": 0 }
+      },
+      "allOf": [
+        {
+          "description": "OK면 사유는 null이고 프로토콜을 안다",
+          "if": { "properties": { "status": { "const": "OK" } } },
+          "then": {
+            "properties": {
+              "skippedReason": { "type": "null" },
+              "protocol": { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsStorageProtocol" }
+            }
+          }
+        },
+        {
+          "description": "SKIPPED면 사유가 있고 값은 모두 null",
+          "if": { "properties": { "status": { "const": "SKIPPED" } } },
+          "then": {
+            "properties": {
+              "skippedReason": { "enum": ["NO_PERMISSION", "UNSUPPORTED", "TOOL_ERROR"] },
+              "protocol": { "type": "null" },
+              "percentageUsed": { "type": "null" },
+              "availableSpare": { "type": "null" },
+              "criticalWarning": { "type": "null" },
+              "mediaErrors": { "type": "null" },
+              "powerOnHours": { "type": "null" }
+            }
+          }
+        }
+      ]
+    },
+    "Benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "unit", "trials", "median"],
+      "description": "같은 조건에서 3회 측정과 중앙값. 중앙값이 trials의 가운데 값인지는 서버가 확인한다.",
+      "properties": {
+        "metric": { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsBenchmarkMetric" },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 16, "description": "예: ops/s, MB/s" },
+        "trials": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": "number", "exclusiveMinimum": 0 }
+        },
+        "median": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  }
+}
