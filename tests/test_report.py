@@ -46,3 +46,8 @@ def test_요약에는_올라갈_값과_실행한_명령이_보인다(runner):
     assert "SSD: 생략 (사유 TOOL_ERROR)" in text
     assert "벤치마크: 돌리지 않음 (사유 NO_AC_POWER)" in text
     assert "system_profiler SPHardwareDataType -json" in text
+
+
+def test_3회_측정_편차는_범위의_절반을_중앙값으로_나눈_백분율이다():
+    assert report.spread_percent([90.0, 100.0, 110.0], 100.0) == 10.0
+    assert report.spread_percent([0.0, 0.0, 0.0], 0.0) == 0.0

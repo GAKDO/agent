@@ -39,3 +39,25 @@ def test_실제_작업은_양수를_내고_디스크_임시_파일을_남기지_
     read, write = benchmark.disk(2)
     assert read > 0 and write > 0
     assert list(tmp_path.iterdir()) == []
+
+
+def test_디스크는_회차마다_한_번만_쓰고_읽어_읽기와_쓰기_값을_함께_쓴다():
+    calls: list[int] = []
+
+    def fake_disk() -> tuple[float, float]:
+        calls.append(1)
+        return 100.0 + len(calls), 10.0 + len(calls)
+
+    workloads = benchmark.default_workloads(fake_disk)
+    jobs = {m: workloads[m] for m in ("DISK_READ", "DISK_WRITE")}
+    results, _ = benchmark.run(True, jobs)
+
+    assert len(calls) == 3
+    assert results[0]["trials"] == [101.0, 102.0, 103.0]
+    assert results[1]["trials"] == [11.0, 12.0, 13.0]
+
+
+def test_벤치마크가_도는_동안_지표마다_진행을_알린다():
+    lines: list[str] = []
+    benchmark.run(True, counting_workloads([]), progress=lines.append)
+    assert lines[0] == "벤치마크 1/5: CPU_SINGLE 3회" and len(lines) == 5

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing
 import os
 import re
 import sys
@@ -34,8 +35,12 @@ def _run(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str], 
         if not api:
             print("환경 변수가 없음: TRACE_API_URL", file=sys.stderr)
             return 2
+    print("기기 정보를 읽는 중이에요...", flush=True)
     collected = macos.collect(run)
-    benches, skipped = benchmark.run(collected["conditions"]["acPower"], workloads)
+    if collected["conditions"]["acPower"]:
+        print("벤치마크를 돌려요. 1분쯤 걸리니 전원을 연결한 채로 기다려 주세요.", flush=True)
+    benches, skipped = benchmark.run(collected["conditions"]["acPower"], workloads,
+                                     progress=lambda line: print("  " + line, flush=True))
     collected_at = clock()
     doc = report.assemble(collected, agent_version=__version__, collected_at=collected_at, consented_at=collected_at,
                           benchmarks=benches, benchmark_skipped_reason=skipped)
@@ -66,6 +71,7 @@ def _run(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str], 
 def main(argv: list[str] | None = None, *, env: Mapping[str, str] | None = None, ask: Callable[[str], str] = input,
          run: commands.Runner = commands.run, post: upload.Post = upload.http_post, workloads: Any = None,
          clock: Callable[[], str] = macos.iso_now) -> int:
+    multiprocessing.freeze_support()  # PyInstaller 단일 실행 파일에서 CPU_MULTI가 프로세스를 끝없이 띄우지 않게
     args_list = sys.argv[1:] if argv is None else argv
     if not args_list:
         print(f"trace-agent {__version__}")
