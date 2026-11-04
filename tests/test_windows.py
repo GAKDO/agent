@@ -165,6 +165,7 @@ def test_윈도우_명령은_컴퓨터_이름_사용자_이름_UUID를_꺼내지
             assert word not in script
     assert "Name" not in " ".join(windows.SYSTEM)  # Win32_ComputerSystem.Name = 컴퓨터 이름
     assert all(len(s) <= 200 for s in collected["sources"])
+    assert all(len(" ".join(argv)) <= 200 for argv in windows.WINDOWS.values())  # 계약: sources 항목 200자
 
 
 def test_win32에서는_윈도우_수집기로_진단한다(tmp_path, capsys):
@@ -217,3 +218,33 @@ def test_배터리_리포트도_실패하면_TOOL_ERROR다():
 
 def report_error_free(collected: dict) -> bool:
     return report.errors(_doc(collected)) == []
+
+
+MISSING_SMART = {windows.SMARTCTL: Output(windows.SMARTCTL, None, "", "명령 없음")}
+
+
+def test_smartctl이_없으면_Windows_기본_기능으로_마모도와_가동_시간을_읽는다():
+    runner = WinRunner({**MISSING_SMART, windows.RELIABILITY: Output(windows.RELIABILITY, 0,
+                                                                     '{"Wear": 4, "PowerOnHours": 6252}')})
+    collected = windows.collect(runner)
+    assert collected["storage"] == {"status": "OK", "skippedReason": None, "protocol": "NVME", "percentageUsed": 4,
+                                    "availableSpare": None, "criticalWarning": None, "mediaErrors": None,
+                                    "powerOnHours": 6252}
+    assert " ".join(windows.RELIABILITY) in collected["sources"]
+    assert report_error_free(collected)
+
+
+def test_smartctl이_되면_기본_기능은_부르지_않는다():
+    runner = WinRunner()
+    windows.collect(runner)
+    assert windows.RELIABILITY not in runner.calls
+
+
+def test_기본_기능도_권한이_없으면_NO_PERMISSION_값이_없으면_UNSUPPORTED다():
+    denied = Output(windows.RELIABILITY, 1, "", "Get-StorageReliabilityCounter : Access denied")
+    assert windows.collect(WinRunner({**MISSING_SMART, windows.RELIABILITY: denied}))["storage"]["skippedReason"] \
+        == "NO_PERMISSION"
+    empty = Output(windows.RELIABILITY, 0, '{"Wear": null, "PowerOnHours": null}')
+    collected = windows.collect(WinRunner({**MISSING_SMART, windows.RELIABILITY: empty}))
+    assert collected["storage"]["skippedReason"] == "UNSUPPORTED"
+    assert report_error_free(collected)

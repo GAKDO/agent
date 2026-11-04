@@ -50,6 +50,9 @@ WINDOWS: dict[str, tuple[str, ...]] = {
                                "Select-Object DesignCapacity,FullChargeCapacity,CycleCount" + _JSON),
     "PROCESSES": _ps("(Get-Process).Count"),
     "UPTIME": _ps("[int]((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalSeconds"),
+    # smartctl이 없으면 Windows 기본 기능으로 내장 디스크(첫 번째 USB 아닌 디스크)의 마모도·가동 시간(관리자 권한 필요)
+    "RELIABILITY": _ps("Get-PhysicalDisk | ? BusType -ne USB | select -First 1 | "
+                       "Get-StorageReliabilityCounter | select Wear,PowerOnHours" + _JSON),
     "SMARTCTL": ("smartctl", "-j", "-a", "/dev/sda"),
     "SMARTCTL_DEFAULT_PATH": (r"C:\Program Files\smartmontools\bin\smartctl.exe", "-j", "-a", "/dev/sda"),
 }

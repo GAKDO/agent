@@ -23,6 +23,7 @@ BATTERY, BATTERY_STATIC, BATTERY_FULL, BATTERY_CYCLE, BATTERY_STATUS = (
 PROCESSES, UPTIME, SMARTCTL, SMARTCTL_DEFAULT_PATH = (
     WINDOWS[k] for k in ("PROCESSES", "UPTIME", "SMARTCTL", "SMARTCTL_DEFAULT_PATH"))
 BATTERY_REPORT, BATTERY_REPORT_READ = WINDOWS["BATTERY_REPORT"], WINDOWS["BATTERY_REPORT_READ"]
+RELIABILITY = WINDOWS["RELIABILITY"]
 REPORT_FILE = "trace-battery.xml"  # %TEMP% 안. 읽은 뒤 지운다
 
 # Get-PhysicalDisk는 PowerShell 버전에 따라 숫자나 글자로 준다
@@ -196,6 +197,26 @@ def parse_storage(out: Output) -> dict[str, Any]:
     return parse_smartctl(out)
 
 
+def parse_reliability(out: Output, disks: str) -> dict[str, Any]:
+    """smartctl을 못 쓸 때 Get-StorageReliabilityCounter의 Wear(=사용률 %)·PowerOnHours. 예비·경고·미디어 오류는 주지 않아 null."""
+    def skipped(reason: str) -> dict[str, Any]:
+        return {"status": "SKIPPED", "skippedReason": reason, **dict.fromkeys(_SSD_NULLS)}
+
+    if not out.ok:
+        return skipped("NO_PERMISSION" if _denied(out) else "TOOL_ERROR")
+    counter = (rows(out.stdout) or [{}])[0]
+    wear, hours = _int(counter.get("Wear")), _int(counter.get("PowerOnHours"))
+    internal = [d for d in rows(disks) if _label(d.get("BusType"), _BUS) != "USB"]
+    bus = _label(internal[0].get("BusType"), _BUS) if internal else None
+    protocol = {"NVMe": "NVME", "SATA": "ATA"}.get(bus or "")
+    if protocol is None or (wear is None and hours is None):
+        return skipped("UNSUPPORTED")
+    return {"status": "OK", "skippedReason": None, "protocol": protocol,
+            "percentageUsed": wear if wear is not None and 0 <= wear <= 255 else None, "availableSpare": None,
+            "criticalWarning": None, "mediaErrors": None,
+            "powerOnHours": hours if hours is not None and hours >= 0 else None}
+
+
 def _os_version() -> str:
     """Windows는 platform.version()이 빌드 번호(10.0.22631)다. 다른 OS에서 테스트할 때는 release로 대신한다."""
     version = platform.version() if sys.platform == "win32" else platform.release()
@@ -218,6 +239,11 @@ def collect(run: Runner) -> dict[str, Any]:
     def text(argv: tuple[str, ...]) -> str:
         return outs[argv].stdout if outs[argv].ok else ""
 
+    storage = parse_storage(smart)
+    if storage["skippedReason"] == "TOOL_ERROR":  # smartctl이 없거나 실패: Windows 기본 기능으로
+        outs[RELIABILITY] = run(RELIABILITY)
+        storage = parse_reliability(outs[RELIABILITY], text(DISKS))
+
     components = parse_cpu(text(CPU)) + parse_memory(text(MEMORY)) + parse_disks(text(DISKS))
     battery, battery_part = parse_battery(outs[BATTERY], outs[BATTERY_STATIC], outs[BATTERY_FULL], outs[BATTERY_CYCLE],
                                           report)
@@ -230,6 +256,6 @@ def collect(run: Runner) -> dict[str, Any]:
         "conditions": parse_conditions(text(BATTERY), text(BATTERY_STATUS), text(PROCESSES), text(UPTIME)),
         "components": components,
         "battery": battery,
-        "storage": parse_storage(smart),
+        "storage": storage,
         "sources": [o.source for o in outs.values()],
     }

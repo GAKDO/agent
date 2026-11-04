@@ -23,6 +23,7 @@ trace-agent run --code 482913      # 관리자 화면의 페어링 코드: 결�
 ## 실행 (Windows)
 
 PowerShell을 **관리자 권한으로** 열어야 SSD 수명 값을 읽는다(아니면 SSD는 "생략, NO_PERMISSION").
+smartmontools가 없으면 Windows 기본 기능(`Get-StorageReliabilityCounter`)으로 사용률(Wear)·가동 시간만 읽는다(예비·경고·미디어 오류는 null).
 
 ```powershell
 winget install Python.Python.3.12 Git.Git GitHub.cli smartmontools.smartmontools
