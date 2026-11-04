@@ -176,3 +176,44 @@ def test_win32에서는_윈도우_수집기로_진단한다(tmp_path, capsys):
     printed = capsys.readouterr().out
     assert doc["os"]["type"] == "WINDOWS" and doc["battery"]["designCapacity"]["unit"] == "mWh"
     assert "발열 모름" in printed and code == 0
+
+
+GENERAL_ERROR = "Get-CimInstance : 일반 오류입니다.\n    + FullyQualifiedErrorId : HRESULT 0x80041001"
+
+
+def test_BatteryStaticData가_일반_오류면_배터리_리포트의_mWh로_채운다():
+    report = (FIXTURES / "battery_report.json").read_text(encoding="utf-8")
+    runner = WinRunner({
+        windows.BATTERY_STATIC: Output(windows.BATTERY_STATIC, 1, "", GENERAL_ERROR),
+        windows.BATTERY_CYCLE: Output(windows.BATTERY_CYCLE, 1, "", GENERAL_ERROR),
+        windows.BATTERY_REPORT: Output(windows.BATTERY_REPORT, 0, ""),
+        windows.BATTERY_REPORT_READ: Output(windows.BATTERY_REPORT_READ, 0, report),
+    })
+    collected = windows.collect(runner)
+    battery = collected["battery"]
+    assert battery["status"] == "OK"
+    assert battery["designCapacity"] == {"value": 54000, "unit": "mWh"}  # 리포트 값
+    assert battery["fullChargeCapacity"] == {"value": 74120, "unit": "mWh"}  # root/wmi 값이 있으면 그것
+    assert battery["cycleCount"] == 212
+    assert ("BATTERY", "LGC 80Wh") in [(c["kind"], c["identifier"]) for c in collected["components"]]
+    assert " ".join(windows.BATTERY_REPORT) in collected["sources"]
+    assert report_error_free(collected)
+
+
+def test_root_wmi로_다_읽히면_배터리_리포트를_만들지_않는다():
+    runner = WinRunner()
+    windows.collect(runner)
+    assert windows.BATTERY_REPORT not in runner.calls
+
+
+def test_배터리_리포트도_실패하면_TOOL_ERROR다():
+    runner = WinRunner({
+        windows.BATTERY_STATIC: Output(windows.BATTERY_STATIC, 1, "", GENERAL_ERROR),
+        windows.BATTERY_REPORT: Output(windows.BATTERY_REPORT, 1, "", "오류"),
+        windows.BATTERY_REPORT_READ: Output(windows.BATTERY_REPORT_READ, 1, "", "경로를 찾을 수 없습니다"),
+    })
+    assert windows.collect(runner)["battery"]["skippedReason"] == "TOOL_ERROR"
+
+
+def report_error_free(collected: dict) -> bool:
+    return report.errors(_doc(collected)) == []

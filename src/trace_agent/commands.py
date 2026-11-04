@@ -44,6 +44,10 @@ WINDOWS: dict[str, tuple[str, ...]] = {
                         "Select-Object FullChargedCapacity" + _JSON),
     "BATTERY_CYCLE": _ps("Get-CimInstance -Namespace root/wmi BatteryCycleCount | Select-Object CycleCount" + _JSON),
     "BATTERY_STATUS": _ps("Get-CimInstance -Namespace root/wmi BatteryStatus | Select-Object PowerOnline" + _JSON),
+    # BatteryStaticData가 "일반 오류"인 기기(갤럭시 북 등)는 Windows 배터리 리포트에서 같은 mWh 값을 읽는다
+    "BATTERY_REPORT": _ps("powercfg /batteryreport /xml /output $env:TEMP\\trace-battery.xml | Out-Null"),
+    "BATTERY_REPORT_READ": _ps("([xml](gc $env:TEMP\\trace-battery.xml)).BatteryReport.Batteries.Battery | "
+                               "Select-Object DesignCapacity,FullChargeCapacity,CycleCount" + _JSON),
     "PROCESSES": _ps("(Get-Process).Count"),
     "UPTIME": _ps("[int]((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalSeconds"),
     "SMARTCTL": ("smartctl", "-j", "-a", "/dev/sda"),

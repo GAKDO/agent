@@ -8,8 +8,10 @@ SSD 수명 값은 smartctl이고, 관리자 권한이 없으면 SKIPPED + NO_PER
 from __future__ import annotations
 
 import json
+import os
 import platform
 import sys
+import tempfile
 from typing import Any
 
 from .commands import WINDOWS, Output, Runner
@@ -20,6 +22,8 @@ BATTERY, BATTERY_STATIC, BATTERY_FULL, BATTERY_CYCLE, BATTERY_STATUS = (
     WINDOWS[k] for k in ("BATTERY", "BATTERY_STATIC", "BATTERY_FULL", "BATTERY_CYCLE", "BATTERY_STATUS"))
 PROCESSES, UPTIME, SMARTCTL, SMARTCTL_DEFAULT_PATH = (
     WINDOWS[k] for k in ("PROCESSES", "UPTIME", "SMARTCTL", "SMARTCTL_DEFAULT_PATH"))
+BATTERY_REPORT, BATTERY_REPORT_READ = WINDOWS["BATTERY_REPORT"], WINDOWS["BATTERY_REPORT_READ"]
+REPORT_FILE = "trace-battery.xml"  # %TEMP% 안. 읽은 뒤 지운다
 
 # Get-PhysicalDisk는 PowerShell 버전에 따라 숫자나 글자로 준다
 _MEDIA = {3: "HDD", 4: "SSD", 5: "SCM"}
@@ -112,20 +116,27 @@ def _denied(out: Output) -> bool:
     return "denied" in out.stderr.lower() or "액세스" in out.stderr
 
 
-def parse_battery(battery: Output, static: Output, full: Output, cycle: Output
+def _sum(items: list[dict[str, Any]], key: str) -> int | None:
+    return _positive(sum(_int(i.get(key)) or 0 for i in items))
+
+
+def parse_battery(battery: Output, static: Output, full: Output, cycle: Output, report: Output | None = None
                   ) -> tuple[dict[str, Any], dict[str, Any] | None]:
-    """배터리 값과 BATTERY 부품. 용량은 root/wmi mWh 원값, 배터리가 둘이면 더한다. OS 판정·최대 용량 %는 Windows에 없어 null."""
+    """배터리 값과 BATTERY 부품. 용량은 root/wmi mWh 원값, 못 읽은 값은 배터리 리포트(powercfg) mWh로 채운다.
+    배터리가 둘이면 더한다. OS 판정·최대 용량 %는 Windows에 없어 null."""
     if not battery.ok:
         return _skipped_battery("TOOL_ERROR"), None
     if not rows(battery.stdout):
         return {"status": "NO_BATTERY", "skippedReason": None, **dict.fromkeys(_SKIP_NULLS)}, None
     statics = rows(static.stdout) if static.ok else []
-    design = _positive(sum(_int(s.get("DesignedCapacity")) or 0 for s in statics))
-    fulls = rows(full.stdout) if full.ok else []
-    full_mwh = _positive(sum(_int(f.get("FullChargedCapacity")) or 0 for f in fulls))
+    reports = rows(report.stdout) if report is not None and report.ok else []
+    design = _sum(statics, "DesignedCapacity") or _sum(reports, "DesignCapacity")
+    full_mwh = _sum(rows(full.stdout) if full.ok else [], "FullChargedCapacity") or _sum(reports, "FullChargeCapacity")
     if design is None or full_mwh is None:
-        return _skipped_battery("NO_PERMISSION" if _denied(static) or _denied(full) else "TOOL_ERROR"), None
+        denied = _denied(static) or _denied(full) or (report is not None and _denied(report))
+        return _skipped_battery("NO_PERMISSION" if denied else "TOOL_ERROR"), None
     cycles = [_positive(c.get("CycleCount")) for c in (rows(cycle.stdout) if cycle.ok else [])]
+    cycles += [_positive(r.get("CycleCount")) for r in reports]
     result = {
         "status": "OK",
         "skippedReason": None,
@@ -139,6 +150,22 @@ def parse_battery(battery: Output, static: Output, full: Output, cycle: Output
     name = _str(first.get("DeviceName"), 128) or _str(rows(battery.stdout)[0].get("Name"), 128) or "Battery"
     serial = _str(first.get("SerialNumber"), 64)
     return result, {"kind": "BATTERY", "identifier": name, "detail": {"serial": serial} if serial else {}}
+
+
+def _needs_report(outs: dict[tuple[str, ...], Output]) -> bool:
+    """배터리가 있는데 root/wmi에서 설계·완충 용량을 하나라도 못 읽었으면 배터리 리포트를 만든다(2초쯤 걸림)."""
+    if not (outs[BATTERY].ok and rows(outs[BATTERY].stdout)):
+        return False
+    static, full = outs[BATTERY_STATIC], outs[BATTERY_FULL]
+    return not (static.ok and _sum(rows(static.stdout), "DesignedCapacity")) or not (
+        full.ok and _sum(rows(full.stdout), "FullChargedCapacity"))
+
+
+def _remove_report() -> None:
+    try:
+        os.remove(os.path.join(tempfile.gettempdir(), REPORT_FILE))
+    except OSError:
+        pass
 
 
 def parse_conditions(battery: str, status: str, processes: str, uptime: str) -> dict[str, Any]:
@@ -179,6 +206,11 @@ def collect(run: Runner) -> dict[str, Any]:
     """고정 목록 명령을 돌려 진단 JSON 조각(벤치마크·시각 제외)을 만든다."""
     outs = {argv: run(argv) for argv in (SYSTEM, BIOS, CPU, MEMORY, DISKS, VIDEO, BATTERY, BATTERY_STATIC,
                                          BATTERY_FULL, BATTERY_CYCLE, BATTERY_STATUS, PROCESSES, UPTIME, SMARTCTL)}
+    report = None
+    if _needs_report(outs):
+        outs[BATTERY_REPORT] = run(BATTERY_REPORT)
+        report = outs[BATTERY_REPORT_READ] = run(BATTERY_REPORT_READ)
+        _remove_report()
     smart = outs[SMARTCTL]
     if smart.code is None:  # PATH에 없으면 기본 설치 경로
         smart = outs[SMARTCTL_DEFAULT_PATH] = run(SMARTCTL_DEFAULT_PATH)
@@ -187,7 +219,8 @@ def collect(run: Runner) -> dict[str, Any]:
         return outs[argv].stdout if outs[argv].ok else ""
 
     components = parse_cpu(text(CPU)) + parse_memory(text(MEMORY)) + parse_disks(text(DISKS))
-    battery, battery_part = parse_battery(outs[BATTERY], outs[BATTERY_STATIC], outs[BATTERY_FULL], outs[BATTERY_CYCLE])
+    battery, battery_part = parse_battery(outs[BATTERY], outs[BATTERY_STATIC], outs[BATTERY_FULL], outs[BATTERY_CYCLE],
+                                          report)
     if battery_part:
         components.append(battery_part)
     components += parse_video(text(VIDEO))
