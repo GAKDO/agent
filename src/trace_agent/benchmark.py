@@ -32,10 +32,12 @@ def cpu_multi(seconds: float = 1.5) -> float:
 
 
 def mem_copy(size_mb: int = 64, rounds: int = 10) -> float:
-    src = bytearray(size_mb * _MB)
+    """미리 잡은 버퍼에 복사한 MB/s. 회차마다 새로 할당하면 OS의 페이지 할당 비용(특히 Windows)이 섞인다."""
+    src, dst = bytearray(size_mb * _MB), bytearray(size_mb * _MB)
+    dst[:] = src  # 페이지를 먼저 잡아 둔다
     start = time.perf_counter()
     for _ in range(rounds):
-        bytes(src)
+        dst[:] = src
     return size_mb * rounds / (time.perf_counter() - start)
 
 
@@ -49,8 +51,20 @@ def _no_cache(fd: int) -> None:
         pass
 
 
+def _full_sync(fd: int) -> None:
+    """macOS F_FULLFSYNC: fsync만으로는 SSD 안 캐시에 남아 쓰기 값이 들쭉날쭉하다. 없는 OS는 fsync."""
+    try:
+        import fcntl
+
+        fcntl.fcntl(fd, getattr(fcntl, "F_FULLFSYNC", 51))
+        return
+    except (ImportError, OSError):
+        pass
+    os.fsync(fd)
+
+
 def _drop_cache(fd: int) -> None:
-    """리눅스: 쓴 뒤 페이지 캐시를 버려 읽기 값이 캐시 속도가 되지 않게. Windows는 AG2에서 따로 처리한다."""
+    """리눅스: 쓴 뒤 페이지 캐시를 버려 읽기 값이 캐시 속도가 되지 않게."""
     advise = getattr(os, "posix_fadvise", None)
     if advise is not None:
         try:
@@ -59,27 +73,96 @@ def _drop_cache(fd: int) -> None:
             pass
 
 
-def disk(size_mb: int = 256) -> tuple[float, float]:
-    """임시 파일에 쓰고(fsync) 다시 읽은 MB/s. 파일은 바로 지운다. 사용자 파일은 건드리지 않는다."""
-    chunk = os.urandom(_MB)
-    fd, path = tempfile.mkstemp(prefix="trace-bench-")
+def _posix_io(path: str, size_mb: int) -> tuple[float, float]:
+    """캐시를 끈 핸들로 쓰고(F_FULLFSYNC) 닫은 뒤, 캐시를 끈 새 핸들로 읽는다(맥에서 3회 편차 ±1% 안팎)."""
+    chunk_mb = 4 if size_mb % 4 == 0 else 1
+    chunk = os.urandom(chunk_mb * _MB)
+    fd = os.open(path, os.O_WRONLY | getattr(os, "O_BINARY", 0))
     try:
         _no_cache(fd)
         start = time.perf_counter()
-        for _ in range(size_mb):
+        for _ in range(size_mb // chunk_mb):
             os.write(fd, chunk)
-        os.fsync(fd)
+        _full_sync(fd)
         write = size_mb / (time.perf_counter() - start)
+    finally:
+        os.close(fd)
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+    try:
+        _no_cache(fd)
         _drop_cache(fd)
-        os.lseek(fd, 0, os.SEEK_SET)
         start = time.perf_counter()
         while os.read(fd, 4 * _MB):
             pass
         read = size_mb / (time.perf_counter() - start)
     finally:
         os.close(fd)
-        os.unlink(path)
     return read, write
+
+
+def _windows_io(path: str, size_mb: int) -> tuple[float, float] | None:
+    """Windows: FILE_FLAG_NO_BUFFERING(+쓰기는 WRITE_THROUGH)로 캐시를 거치지 않고 쓰고 읽은 MB/s. 실패하면 None."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        return None
+    k = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+    k.CreateFileW.restype = wintypes.HANDLE
+    k.VirtualAlloc.restype = ctypes.c_void_p
+    k.VirtualAlloc.argtypes = (ctypes.c_void_p, ctypes.c_size_t, wintypes.DWORD, wintypes.DWORD)
+    k.VirtualFree.argtypes = (ctypes.c_void_p, ctypes.c_size_t, wintypes.DWORD)
+    io_args = (wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p)
+    k.ReadFile.argtypes = k.WriteFile.argtypes = io_args
+    k.FlushFileBuffers.argtypes = k.CloseHandle.argtypes = (wintypes.HANDLE,)
+    invalid = wintypes.HANDLE(-1).value
+    generic_read, generic_write, share_all, open_existing = 0x80000000, 0x40000000, 0x7, 3
+    no_buffering, write_through, sequential = 0x20000000, 0x80000000, 0x08000000
+    size = _MB  # 섹터 크기의 배수이고, VirtualAlloc 버퍼는 페이지 정렬이라 NO_BUFFERING 조건을 맞춘다
+    buf = k.VirtualAlloc(None, size, 0x3000, 0x04)  # MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE
+    if not buf:
+        return None
+    try:
+        ctypes.memmove(buf, os.urandom(size), size)
+        done = wintypes.DWORD(0)
+        handle = k.CreateFileW(path, generic_write, share_all, None, open_existing, no_buffering | write_through, None)
+        if handle in (None, invalid):
+            return None
+        try:
+            start = time.perf_counter()
+            for _ in range(size_mb):
+                if not k.WriteFile(handle, buf, size, ctypes.byref(done), None) or done.value != size:
+                    return None
+            k.FlushFileBuffers(handle)
+            write = size_mb / (time.perf_counter() - start)
+        finally:
+            k.CloseHandle(handle)
+        handle = k.CreateFileW(path, generic_read, share_all, None, open_existing, no_buffering | sequential, None)
+        if handle in (None, invalid):
+            return None
+        try:
+            total, start = 0, time.perf_counter()
+            while k.ReadFile(handle, buf, size, ctypes.byref(done), None) and done.value:
+                total += done.value
+            elapsed = time.perf_counter() - start
+        finally:
+            k.CloseHandle(handle)
+        return (total / _MB / elapsed, write) if total and elapsed > 0 else None
+    finally:
+        k.VirtualFree(buf, 0, 0x8000)  # MEM_RELEASE
+
+
+def disk(size_mb: int = 256) -> tuple[float, float]:
+    """임시 파일에 쓰고 다시 읽은 (읽기, 쓰기) MB/s. 둘 다 OS 캐시를 거치지 않게 잰다. 파일은 바로 지운다.
+    사용자 파일은 건드리지 않는다."""
+    fd, path = tempfile.mkstemp(prefix="trace-bench-")
+    os.close(fd)
+    try:
+        if os.name == "nt" and (measured := _windows_io(path, size_mb)) is not None:
+            return measured
+        return _posix_io(path, size_mb)
+    finally:
+        os.unlink(path)
 
 
 def default_workloads(measure_disk: Callable[[], tuple[float, float]] = disk

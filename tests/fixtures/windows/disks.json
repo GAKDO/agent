@@ -1,0 +1,18 @@
+[
+    {
+        "FriendlyName":  "SAMSUNG MZVL2512HCJQ-00B00",
+        "SerialNumber":  "SSDTEST01",
+        "Size":  512110190592,
+        "MediaType":  4,
+        "BusType":  17,
+        "HealthStatus":  0
+    },
+    {
+        "FriendlyName":  "SanDisk Ultra",
+        "SerialNumber":  "USBTEST01",
+        "Size":  30752636928,
+        "MediaType":  0,
+        "BusType":  7,
+        "HealthStatus":  0
+    }
+]

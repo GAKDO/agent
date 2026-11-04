@@ -7,4 +7,7 @@ main에 버전이 적힌 CHANGELOG가 올라가면 release.yml이 태그와 GitH
 ## [Unreleased]
 
 ### 추가
+- 벤치마크 안정화: 디스크는 캐시를 끈 핸들로 쓰고 읽음(macOS F_FULLFSYNC, Windows NO_BUFFERING·WRITE_THROUGH), 메모리 복사는 미리 잡은 버퍼에
+- Windows: smartctl이 없으면 Get-StorageReliabilityCounter로 SSD 사용률·가동 시간
+- Windows 진단 수집기(AG2): PowerShell CIM·root/wmi 배터리 mWh·smartctl, 디스크 읽기 캐시 우회
 - 블로그(AIGJ-01-002-blog/devlog) CI/CD를 옮겨 초기 구성

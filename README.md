@@ -20,6 +20,26 @@ trace-agent run --code 482913      # 관리자 화면의 페어링 코드: 결�
 - 읽는 명령은 `src/trace_agent/commands.py`의 `ALLOWED` 목록뿐이다. 사용자 파일·브라우저 기록은 읽지 않고, 컴퓨터 이름·플랫폼 UUID는 보내지 않는다.
 - 결과 형식은 contracts 진단 JSON(diag.v1)이고, 올리기 전에 `src/trace_agent/schema/`의 복사본으로 검증한다.
 
+## 실행 (Windows)
+
+PowerShell을 **관리자 권한으로** 열어야 SSD 수명 값을 읽는다(아니면 SSD는 "생략, NO_PERMISSION").
+smartmontools가 없으면 Windows 기본 기능(`Get-StorageReliabilityCounter`)으로 사용률(Wear)·가동 시간만 읽는다(예비·경고·미디어 오류는 null).
+
+```powershell
+winget install Python.Python.3.12 Git.Git GitHub.cli smartmontools.smartmontools
+# 설치 뒤 PowerShell 창을 새로 연다
+gh auth login
+gh repo clone GAKDO/agent -- -b develop; cd agent
+py -3.12 -m venv .venv; .\.venv\Scripts\Activate.ps1   # 막히면 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+python -m pip install -e .
+trace-agent run
+```
+
+- 스마트 앱 컨트롤 같은 앱 제어가 켜져 있으면 서명 없는 `pip.exe`·`trace-agent.exe`가 막힌다. 그때는 `.\.venv\Scripts\python.exe -m pip install -e .`, `.\.venv\Scripts\python.exe -m trace_agent run`으로 부른다(Activate도 필요 없음)
+- 학교 망처럼 pypi.org·python.org가 막히면 파이썬은 `https://www.nuget.org/api/v2/package/python/3.12.10`(zip, `tools\python.exe`), 패키지는 `pip install -i https://mirror.kakao.com/pypi/simple -e .`로 받는다
+- 읽는 값: `Get-CimInstance`(기기·CPU·RAM·화면·배터리), `Get-PhysicalDisk`(SSD), `root/wmi`(배터리 설계·완충 mWh, 사이클. 못 읽으면 `powercfg /batteryreport` XML), smartctl(SSD 수명). 명령 전체는 `commands.py`의 `WINDOWS`
+- 발열 상태·OS 배터리 판정·최대 용량 %는 Windows에서 읽지 않아 null이다(계약대로)
+
 ## 테스트
 
 ```bash

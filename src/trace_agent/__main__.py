@@ -17,7 +17,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from . import __version__, benchmark, commands, macos, report, upload
+from . import __version__, benchmark, commands, macos, report, upload, windows
 
 
 def _save(doc: dict[str, Any], out: Path) -> None:
@@ -36,7 +36,7 @@ def _run(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str], 
             print("환경 변수가 없음: TRACE_API_URL", file=sys.stderr)
             return 2
     print("기기 정보를 읽는 중이에요...", flush=True)
-    collected = macos.collect(run)
+    collected = (windows if args.system == "win32" else macos).collect(run)
     if collected["conditions"]["acPower"]:
         print("벤치마크를 돌려요. 1분쯤 걸리니 전원을 연결한 채로 기다려 주세요.", flush=True)
     benches, skipped = benchmark.run(collected["conditions"]["acPower"], workloads,
@@ -70,7 +70,7 @@ def _run(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str], 
 
 def main(argv: list[str] | None = None, *, env: Mapping[str, str] | None = None, ask: Callable[[str], str] = input,
          run: commands.Runner = commands.run, post: upload.Post = upload.http_post, workloads: Any = None,
-         clock: Callable[[], str] = macos.iso_now) -> int:
+         clock: Callable[[], str] = macos.iso_now, system: str = sys.platform) -> int:
     multiprocessing.freeze_support()  # PyInstaller 단일 실행 파일에서 CPU_MULTI가 프로세스를 끝없이 띄우지 않게
     args_list = sys.argv[1:] if argv is None else argv
     if not args_list:
@@ -82,6 +82,7 @@ def main(argv: list[str] | None = None, *, env: Mapping[str, str] | None = None,
     run_parser.add_argument("--code", help="관리자 화면의 6자리 페어링 코드")
     run_parser.add_argument("--out", type=Path, default=Path("trace-diagnostics.json"), help="JSON을 남길 파일")
     args = parser.parse_args(args_list)
+    args.system = system  # win32면 Windows 수집기(AG2), 그 밖은 macOS 수집기
     return _run(args, os.environ if env is None else env, ask, run, post, workloads, clock)
 
 
