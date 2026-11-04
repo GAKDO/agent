@@ -50,13 +50,49 @@ def _no_cache(fd: int) -> None:
 
 
 def _drop_cache(fd: int) -> None:
-    """리눅스: 쓴 뒤 페이지 캐시를 버려 읽기 값이 캐시 속도가 되지 않게. Windows는 AG2에서 따로 처리한다."""
+    """리눅스: 쓴 뒤 페이지 캐시를 버려 읽기 값이 캐시 속도가 되지 않게. Windows는 `_read_uncached_windows`."""
     advise = getattr(os, "posix_fadvise", None)
     if advise is not None:
         try:
             advise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
         except OSError:
             pass
+
+
+def _read_uncached_windows(path: str) -> float | None:
+    """Windows: FILE_FLAG_NO_BUFFERING으로 다시 열어 캐시를 거치지 않고 읽은 MB/s. 실패하면 None(보통 읽기로 잰다)."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        return None
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+    kernel32.CreateFileW.restype = wintypes.HANDLE
+    kernel32.VirtualAlloc.restype = ctypes.c_void_p
+    kernel32.VirtualAlloc.argtypes = (ctypes.c_void_p, ctypes.c_size_t, wintypes.DWORD, wintypes.DWORD)
+    kernel32.VirtualFree.argtypes = (ctypes.c_void_p, ctypes.c_size_t, wintypes.DWORD)
+    kernel32.ReadFile.argtypes = (wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD),
+                                  ctypes.c_void_p)
+    generic_read, share_all, open_existing = 0x80000000, 0x7, 3
+    no_buffering, sequential = 0x20000000, 0x08000000
+    handle = kernel32.CreateFileW(path, generic_read, share_all, None, open_existing, no_buffering | sequential, None)
+    if handle in (None, wintypes.HANDLE(-1).value):
+        return None
+    size = 4 * _MB  # 섹터 크기의 배수이고, VirtualAlloc 버퍼는 페이지 정렬이라 NO_BUFFERING 조건을 맞춘다
+    buf = kernel32.VirtualAlloc(None, size, 0x3000, 0x04)  # MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE
+    try:
+        if not buf:
+            return None
+        got, total = wintypes.DWORD(0), 0
+        start = time.perf_counter()
+        while kernel32.ReadFile(handle, buf, size, ctypes.byref(got), None) and got.value:
+            total += got.value
+        elapsed = time.perf_counter() - start
+        return total / _MB / elapsed if total and elapsed > 0 else None
+    finally:
+        if buf:
+            kernel32.VirtualFree(buf, 0, 0x8000)  # MEM_RELEASE
+        kernel32.CloseHandle(handle)
 
 
 def disk(size_mb: int = 256) -> tuple[float, float]:
@@ -70,12 +106,16 @@ def disk(size_mb: int = 256) -> tuple[float, float]:
             os.write(fd, chunk)
         os.fsync(fd)
         write = size_mb / (time.perf_counter() - start)
-        _drop_cache(fd)
-        os.lseek(fd, 0, os.SEEK_SET)
-        start = time.perf_counter()
-        while os.read(fd, 4 * _MB):
-            pass
-        read = size_mb / (time.perf_counter() - start)
+        uncached = _read_uncached_windows(path) if os.name == "nt" else None
+        if uncached is not None:
+            read = uncached
+        else:
+            _drop_cache(fd)
+            os.lseek(fd, 0, os.SEEK_SET)
+            start = time.perf_counter()
+            while os.read(fd, 4 * _MB):
+                pass
+            read = size_mb / (time.perf_counter() - start)
     finally:
         os.close(fd)
         os.unlink(path)

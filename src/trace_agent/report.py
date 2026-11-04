@@ -85,7 +85,8 @@ def summary(doc: dict[str, Any]) -> str:
         )
     else:
         lines.append(f"SSD: 생략 (사유 {s['skippedReason']})")
-    lines.append(f"조건: 전원 {'연결' if c['acPower'] else '없음'}, 잔량 {c['batteryPercent']}%, 발열 {c['thermalState']}")
+    pct = "모름" if c["batteryPercent"] is None else f"{c['batteryPercent']}%"
+    lines.append(f"조건: 전원 {'연결' if c['acPower'] else '없음'}, 잔량 {pct}, 발열 {c['thermalState'] or '모름'}")
     if doc["benchmarks"]:
         lines.append("벤치마크(중앙값, 3회 편차): " + ", ".join(
             f"{x['metric']} {x['median']} {x['unit']} ±{spread_percent(x['trials'], x['median'])}%"

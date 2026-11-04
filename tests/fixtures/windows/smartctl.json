@@ -1,0 +1,12 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {"version": [7, 4], "exit_status": 0},
+  "device": {"name": "/dev/sda", "info_name": "/dev/sda", "type": "nvme", "protocol": "NVMe"},
+  "model_name": "SAMSUNG MZVL2512HCJQ-00B00",
+  "nvme_smart_health_information_log": {
+    "critical_warning": 0, "temperature": 38, "available_spare": 100, "available_spare_threshold": 10,
+    "percentage_used": 2, "data_units_read": 9876543, "data_units_written": 8765432,
+    "power_cycles": 612, "power_on_hours": 1430, "unsafe_shutdowns": 41, "media_errors": 0,
+    "num_err_log_entries": 0
+  }
+}

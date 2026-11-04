@@ -9,7 +9,7 @@ import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 
-ALLOWED: tuple[tuple[str, ...], ...] = (
+MACOS: tuple[tuple[str, ...], ...] = (
     ("system_profiler", "SPHardwareDataType", "-json"),
     ("system_profiler", "SPPowerDataType", "-json"),
     ("system_profiler", "SPNVMeDataType", "-json"),
@@ -21,6 +21,36 @@ ALLOWED: tuple[tuple[str, ...], ...] = (
     ("ps", "-A", "-o", "pid="),
     ("sysctl", "-n", "kern.boottime"),
 )
+
+
+def _ps(script: str) -> tuple[str, ...]:
+    return ("powershell", "-NoProfile", "-NonInteractive", "-Command", script)
+
+
+# Windows(AG2): PowerShell은 고른 속성만 꺼낸다. Name·UserName·UUID는 Select-Object에 없다.
+_JSON = " | ConvertTo-Json"
+WINDOWS: dict[str, tuple[str, ...]] = {
+    "SYSTEM": _ps("Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer,Model,SystemFamily" + _JSON),
+    "BIOS": _ps("Get-CimInstance Win32_BIOS | Select-Object SerialNumber" + _JSON),
+    "CPU": _ps("Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors" + _JSON),
+    "MEMORY": _ps("Get-CimInstance Win32_PhysicalMemory | Select-Object Capacity" + _JSON),
+    "DISKS": _ps("Get-PhysicalDisk | Select-Object FriendlyName,SerialNumber,Size,MediaType,BusType,HealthStatus" + _JSON),
+    "VIDEO": _ps("Get-CimInstance Win32_VideoController | "
+                 "Select-Object Name,CurrentHorizontalResolution,CurrentVerticalResolution" + _JSON),
+    "BATTERY": _ps("Get-CimInstance Win32_Battery | Select-Object Name,EstimatedChargeRemaining,BatteryStatus" + _JSON),
+    "BATTERY_STATIC": _ps("Get-CimInstance -Namespace root/wmi BatteryStaticData | "
+                          "Select-Object DeviceName,SerialNumber,DesignedCapacity" + _JSON),
+    "BATTERY_FULL": _ps("Get-CimInstance -Namespace root/wmi BatteryFullChargedCapacity | "
+                        "Select-Object FullChargedCapacity" + _JSON),
+    "BATTERY_CYCLE": _ps("Get-CimInstance -Namespace root/wmi BatteryCycleCount | Select-Object CycleCount" + _JSON),
+    "BATTERY_STATUS": _ps("Get-CimInstance -Namespace root/wmi BatteryStatus | Select-Object PowerOnline" + _JSON),
+    "PROCESSES": _ps("(Get-Process).Count"),
+    "UPTIME": _ps("[int]((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalSeconds"),
+    "SMARTCTL": ("smartctl", "-j", "-a", "/dev/sda"),
+    "SMARTCTL_DEFAULT_PATH": (r"C:\Program Files\smartmontools\bin\smartctl.exe", "-j", "-a", "/dev/sda"),
+}
+
+ALLOWED: tuple[tuple[str, ...], ...] = MACOS + tuple(WINDOWS.values())
 
 
 @dataclass(frozen=True)
@@ -50,7 +80,7 @@ def run(argv: tuple[str, ...], timeout: float = 60) -> Output:
     if argv not in ALLOWED:
         raise NotAllowed(" ".join(argv))
     try:
-        done = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False)
+        done = subprocess.run(argv, capture_output=True, text=True, errors="replace", timeout=timeout, check=False)
     except FileNotFoundError:
         return Output(argv, None, "", "명령 없음")
     except subprocess.TimeoutExpired:

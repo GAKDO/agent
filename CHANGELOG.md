@@ -7,4 +7,5 @@ main에 버전이 적힌 CHANGELOG가 올라가면 release.yml이 태그와 GitH
 ## [Unreleased]
 
 ### 추가
+- Windows 진단 수집기(AG2): PowerShell CIM·root/wmi 배터리 mWh·smartctl, 디스크 읽기 캐시 우회
 - 블로그(AIGJ-01-002-blog/devlog) CI/CD를 옮겨 초기 구성
