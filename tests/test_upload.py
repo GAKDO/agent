@@ -39,7 +39,7 @@ def fast_workloads() -> dict:
 def run_cli(server, answer: str, tmp_path, code: str | None = "482913", runner=None) -> int:
     argv = ["run", "--out", str(tmp_path / "diag.json")] + (["--code", code] if code else [])
     return main(argv, env=ENV, ask=lambda _q: answer, run=runner or FixtureRunner(), post=server,
-                workloads=fast_workloads(), clock=clock())
+                workloads=fast_workloads(), clock=clock(), system="darwin")  # 맥 고정 파일이라 CI windows에서도 macOS 수집기
 
 
 def test_요약_뒤_y가_아니면_어떤_네트워크_요청도_보내지_않는다(tmp_path, capsys):
@@ -92,6 +92,6 @@ def test_전원이_없으면_명령줄에서도_벤치마크를_돌리지_않는
     called: list[int] = []
     workloads = {m: ("ops/s", lambda: called.append(1) or 1.0) for m in ("CPU_SINGLE",)}
     main(["run", "--out", str(tmp_path / "d.json")], env=ENV, ask=lambda _q: "n", run=FixtureRunner(),
-         post=FakeServer(), workloads=workloads, clock=clock())
+         post=FakeServer(), workloads=workloads, clock=clock(), system="darwin")
     assert called == []
     assert json.loads((tmp_path / "d.json").read_text())["benchmarkSkippedReason"] == "NO_AC_POWER"
