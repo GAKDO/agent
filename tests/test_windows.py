@@ -192,9 +192,9 @@ def test_BatteryStaticData가_일반_오류면_배터리_리포트의_mWh로_채
     collected = windows.collect(runner)
     battery = collected["battery"]
     assert battery["status"] == "OK"
-    assert battery["designCapacity"] == {"value": 54000, "unit": "mWh"}  # 리포트 값
+    assert battery["designCapacity"] == {"value": 66990, "unit": "mWh"}  # 리포트 값(갤럭시 북 실기)
     assert battery["fullChargeCapacity"] == {"value": 74120, "unit": "mWh"}  # root/wmi 값이 있으면 그것
-    assert battery["cycleCount"] == 212
+    assert battery["cycleCount"] == 317
     assert ("BATTERY", "LGC 80Wh") in [(c["kind"], c["identifier"]) for c in collected["components"]]
     assert " ".join(windows.BATTERY_REPORT) in collected["sources"]
     assert report_error_free(collected)
