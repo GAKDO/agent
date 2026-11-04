@@ -73,7 +73,7 @@ def summary(doc: dict[str, Any]) -> str:
         lines.append(
             f"배터리: 사이클 {b['cycleCount'] if b['cycleCount'] is not None else '모름'}, "
             f"설계 {_capacity(b['designCapacity'])}, 완충 {_capacity(b['fullChargeCapacity'])}, "
-            f"OS 최대 용량 {b['osMaxCapacityPercent'] if b['osMaxCapacityPercent'] is not None else '모름'}%, "
+            f"OS 최대 용량 {'모름' if b['osMaxCapacityPercent'] is None else str(b['osMaxCapacityPercent']) + '%'}, "
             f"OS 판정 {b['osCondition'] or '모름'}"
         )
     else:

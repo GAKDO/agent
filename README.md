@@ -34,7 +34,9 @@ python -m pip install -e .
 trace-agent run
 ```
 
-- 읽는 값: `Get-CimInstance`(기기·CPU·RAM·화면·배터리), `Get-PhysicalDisk`(SSD), `root/wmi`(배터리 설계·완충 mWh, 사이클), smartctl(SSD 수명). 명령 전체는 `commands.py`의 `WINDOWS`
+- 스마트 앱 컨트롤 같은 앱 제어가 켜져 있으면 서명 없는 `pip.exe`·`trace-agent.exe`가 막힌다. 그때는 `.\.venv\Scripts\python.exe -m pip install -e .`, `.\.venv\Scripts\python.exe -m trace_agent run`으로 부른다(Activate도 필요 없음)
+- 학교 망처럼 pypi.org·python.org가 막히면 파이썬은 `https://www.nuget.org/api/v2/package/python/3.12.10`(zip, `tools\python.exe`), 패키지는 `pip install -i https://mirror.kakao.com/pypi/simple -e .`로 받는다
+- 읽는 값: `Get-CimInstance`(기기·CPU·RAM·화면·배터리), `Get-PhysicalDisk`(SSD), `root/wmi`(배터리 설계·완충 mWh, 사이클. 못 읽으면 `powercfg /batteryreport` XML), smartctl(SSD 수명). 명령 전체는 `commands.py`의 `WINDOWS`
 - 발열 상태·OS 배터리 판정·최대 용량 %는 Windows에서 읽지 않아 null이다(계약대로)
 
 ## 테스트
