@@ -56,6 +56,10 @@ def _capacity(value: dict[str, Any] | None) -> str:
     return f"{value['value']} {value['unit']}" if value else "모름"
 
 
+def _known(value: Any, unit: str = "") -> str:
+    return "모름" if value is None else f"{value}{unit}"
+
+
 def spread_percent(trials: list[float], median: float) -> float:
     """3회 측정 편차 = (최댓값 - 최솟값) ÷ 2 ÷ 중앙값 × 100 (FR-DIA-04). 중앙값이 0이면 0."""
     return round((max(trials) - min(trials)) / 2 / median * 100, 1) if median else 0.0
@@ -80,8 +84,9 @@ def summary(doc: dict[str, Any]) -> str:
         lines.append(f"배터리: {b['status']}" + (f" (사유 {b['skippedReason']})" if b["skippedReason"] else ""))
     if s["status"] == "OK":
         lines.append(
-            f"SSD: {s['protocol']}, 사용률 {s['percentageUsed']}%, 예비 {s['availableSpare']}%, "
-            f"경고 {s['criticalWarning']}, 미디어 오류 {s['mediaErrors']}, 가동 {s['powerOnHours']}시간"
+            f"SSD: {s['protocol']}, 사용률 {_known(s['percentageUsed'], '%')}, 예비 {_known(s['availableSpare'], '%')}, "
+            f"경고 {_known(s['criticalWarning'])}, 미디어 오류 {_known(s['mediaErrors'])}, "
+            f"가동 {_known(s['powerOnHours'], '시간')}"
         )
     else:
         lines.append(f"SSD: 생략 (사유 {s['skippedReason']})")
