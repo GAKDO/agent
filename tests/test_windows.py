@@ -248,3 +248,13 @@ def test_기본_기능도_권한이_없으면_NO_PERMISSION_값이_없으면_UNS
     collected = windows.collect(WinRunner({**MISSING_SMART, windows.RELIABILITY: empty}))
     assert collected["storage"]["skippedReason"] == "UNSUPPORTED"
     assert report_error_free(collected)
+
+
+def test_기본_기능이_가동_시간_없이_Wear_0만_주면_믿지_않고_UNSUPPORTED다():
+    # 갤럭시 북 실측: smartctl은 사용률 4%인데 Get-StorageReliabilityCounter는 Wear 0, PowerOnHours 빈칸
+    zero = Output(windows.RELIABILITY, 0, '{"Wear": 0, "PowerOnHours": null}')
+    collected = windows.collect(WinRunner({**MISSING_SMART, windows.RELIABILITY: zero}))
+    assert collected["storage"]["status"] == "SKIPPED"
+    assert collected["storage"]["skippedReason"] == "UNSUPPORTED"
+    assert collected["storage"]["percentageUsed"] is None
+    assert report_error_free(collected)

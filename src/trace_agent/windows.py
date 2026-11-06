@@ -198,7 +198,8 @@ def parse_storage(out: Output) -> dict[str, Any]:
 
 
 def parse_reliability(out: Output, disks: str) -> dict[str, Any]:
-    """smartctl을 못 쓸 때 Get-StorageReliabilityCounter의 Wear(=사용률 %)·PowerOnHours. 예비·경고·미디어 오류는 주지 않아 null."""
+    """smartctl을 못 쓸 때 Get-StorageReliabilityCounter의 Wear(=사용률 %)·PowerOnHours. 예비·경고·미디어 오류는 주지 않아 null.
+    PowerOnHours가 비면 Wear도 믿지 않는다."""
     def skipped(reason: str) -> dict[str, Any]:
         return {"status": "SKIPPED", "skippedReason": reason, **dict.fromkeys(_SSD_NULLS)}
 
@@ -209,12 +210,14 @@ def parse_reliability(out: Output, disks: str) -> dict[str, Any]:
     internal = [d for d in rows(disks) if _label(d.get("BusType"), _BUS) != "USB"]
     bus = _label(internal[0].get("BusType"), _BUS) if internal else None
     protocol = {"NVMe": "NVME", "SATA": "ATA"}.get(bus or "")
-    if protocol is None or (wear is None and hours is None):
+    # 가동 시간을 못 주는 드라이버는 Wear도 실제 값 대신 0을 채운다(갤럭시 북: smartctl 4%인데 Wear 0).
+    # 가동 시간이 없으면 Wear를 믿지 않고 읽지 못함으로 둔다
+    if protocol is None or hours is None:
         return skipped("UNSUPPORTED")
     return {"status": "OK", "skippedReason": None, "protocol": protocol,
             "percentageUsed": wear if wear is not None and 0 <= wear <= 255 else None, "availableSpare": None,
             "criticalWarning": None, "mediaErrors": None,
-            "powerOnHours": hours if hours is not None and hours >= 0 else None}
+            "powerOnHours": hours if hours >= 0 else None}
 
 
 def _os_version() -> str:
