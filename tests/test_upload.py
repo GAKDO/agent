@@ -179,3 +179,11 @@ def test_빈_키_파일이면_새_키로_올리고_실패하면_그_키를_남�
     assert main(argv, env=ENV, ask=lambda _q: "y", post=server, sleep=lambda _s: None) == 1
     sent = server.requests[-1][2]["Idempotency-Key"]
     assert sent and (tmp_path / "diag.json.key").read_text() == sent
+
+
+def test_보낼_곳의_암호화_표시는_주소의_스킴으로_정한다():
+    from trace_agent.__main__ import _target
+
+    assert "암호화(https)" in _target("https://api.test")
+    assert "암호화되지 않음, 이 컴퓨터 안에서만" in _target("http://localhost:8315")
+    assert "토큰과 시리얼이 그대로" in _target("http://gakdo.example")

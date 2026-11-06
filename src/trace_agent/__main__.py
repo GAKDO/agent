@@ -36,7 +36,13 @@ def _save(doc: dict[str, Any], out: Path, idempotency_key: str | None = None) ->
 
 def _target(api: str) -> str:
     """동의 질문 바로 위에 보일 전송 대상. 평문이면 그 자리에서 다시 알린다."""
-    return f"보낼 곳: {api} ({'암호화되지 않음, 토큰과 시리얼이 그대로 나가요' if upload.insecure(api) else '암호화(https)'})"
+    if api.lower().startswith("https://"):
+        how = "암호화(https)"
+    elif upload.insecure(api):
+        how = "암호화되지 않음, 토큰과 시리얼이 그대로 나가요"
+    else:
+        how = "암호화되지 않음, 이 컴퓨터 안에서만 오가요"  # localhost 시험
+    return f"보낼 곳: {api} ({how})"
 
 
 def _check_api(api: str, code: str | None) -> int | None:
