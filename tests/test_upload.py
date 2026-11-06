@@ -284,3 +284,26 @@ def test_잘못_인코딩된_오류_응답은_빈_본문으로_읽는다(monkeyp
 
     monkeypatch.setattr(urllib.request, "urlopen", raise_http)
     assert upload.http_post("https://api.test/x", {}, {}) == (503, {})
+
+
+def test_응답이_Content_Length보다_일찍_끝나면_UploadError로_바꾼다(monkeypatch):
+    import http.client
+    import urllib.request
+
+    from trace_agent import upload
+
+    class Short:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a) -> None:
+            return None
+
+        def read(self) -> bytes:
+            raise http.client.IncompleteRead(b"{", 10)
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *_a, **_k: Short())
+    with pytest.raises(upload.UploadError):
+        upload.http_post("https://api.test/x", {}, {})

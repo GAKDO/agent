@@ -95,3 +95,11 @@ def test_동의_전_요약에_올라가는_부품_시리얼과_부품_번호가_
         [{"Capacity": 8589934592, "SerialNumber": "A1B2", "PartNumber": "M425R1GB4BB0"}]))}))
     text = report.summary(_doc(collected))
     assert "RAM serial A1B2 partNumber M425R1GB4BB0" in text and "SSD serial SSDTEST01" in text
+
+
+def test_BitLocker_상태가_알_수_없음이나_빈_값이면_꺼짐이_아니라_모름이다():
+    for status in (2, None):
+        out = Output(windows.BITLOCKER, 0, json.dumps([{"DriveLetter": "C:", "ProtectionStatus": status}]))
+        assert windows.collect(WinRunner({windows.BITLOCKER: out}))["checks"] == {"bitLocker": None, "warnings": []}
+    off = Output(windows.BITLOCKER, 0, json.dumps([{"DriveLetter": "C:", "ProtectionStatus": 0}]))
+    assert windows.collect(WinRunner({windows.BITLOCKER: off}))["checks"]["bitLocker"] == "꺼짐"

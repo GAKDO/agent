@@ -243,7 +243,10 @@ def parse_checks(bitlocker: Output) -> dict[str, Any]:
     system = next((v for v in volumes if str(v.get("DriveLetter") or "").upper().startswith("C")), None)
     if system is None:
         return {"bitLocker": None, "warnings": []}
-    on = _int(system.get("ProtectionStatus")) == 1
+    status = _int(system.get("ProtectionStatus"))
+    if status not in (0, 1):  # 2(알 수 없음)나 빈 값을 '꺼짐'으로 오해하지 않게 '모름'으로 둔다
+        return {"bitLocker": None, "warnings": []}
+    on = status == 1
     warnings = ["BitLocker가 켜져 있어요. 복구 키가 회사 계정에 있는지 확인하고 초기화해 주세요"] if on else []
     return {"bitLocker": "켜짐" if on else "꺼짐", "warnings": warnings}
 
