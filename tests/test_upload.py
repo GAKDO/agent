@@ -187,3 +187,20 @@ def test_보낼_곳의_암호화_표시는_주소의_스킴으로_정한다():
     assert "암호화(https)" in _target("https://api.test")
     assert "암호화되지 않음, 이 컴퓨터 안에서만" in _target("http://localhost:8315")
     assert "토큰과 시리얼이 그대로" in _target("http://gakdo.example")
+
+
+def test_코드_없이_새로_남긴_진단에는_지난_진단의_키가_남지_않는다(tmp_path):
+    run_cli(FakeServer(503, {"code": "UNAVAILABLE"}), "y", tmp_path)
+    assert (tmp_path / "diag.json.key").exists()
+    assert run_cli(FakeServer(), "y", tmp_path, code=None) == 0
+    assert not (tmp_path / "diag.json.key").exists()
+
+
+def test_키_없이_처음_올리는_JSON은_동의한_시각을_consentedAt에_적는다(tmp_path):
+    assert run_cli(FakeServer(), "y", tmp_path, code=None) == 0
+    server = FakeServer()
+    argv = ["upload", "--file", str(tmp_path / "diag.json"), "--code", "482913"]
+    assert main(argv, env=ENV, ask=lambda _q: "y", post=server, sleep=lambda _s: None,
+                clock=lambda: "2026-11-02T12:00:00+09:00") == 0
+    doc = server.requests[-1][1]
+    assert doc["consentedAt"] == "2026-11-02T12:00:00+09:00" and doc["collectedAt"] == "2026-11-02T11:00:00+09:00"

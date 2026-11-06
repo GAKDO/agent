@@ -31,6 +31,9 @@ def _save(doc: dict[str, Any], out: Path, idempotency_key: str | None = None) ->
     if idempotency_key:
         # 다시 올릴 때 같은 키를 써야, 사실은 저장됐는데 응답만 못 받은 경우에도 409 대신 처음 응답을 받는다
         _key_file(out).write_text(idempotency_key, encoding="utf-8")
+    else:
+        # 키 없이 새로 남긴 진단에 지난 진단의 키가 붙어 엉뚱한 응답을 받지 않게 지운다
+        _key_file(out).unlink(missing_ok=True)
     print(f"진단 JSON을 {out}에 남겼어요.")
 
 
@@ -116,8 +119,11 @@ def _run(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str], 
 
 
 def _resend(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str], str], post: upload.Post,
-            sleep: upload.Sleep) -> int:
-    """남긴 JSON을 그대로(같은 바이트·같은 키) 다시 올린다. 진단을 다시 돌리지 않는다."""
+            sleep: upload.Sleep, clock: Callable[[], str]) -> int:
+    """남긴 JSON을 다시 올린다. 진단을 다시 돌리지 않는다.
+
+    키 파일이 있으면 이미 동의하고 보냈던 것이라 본문·키를 그대로 쓴다. 없으면 처음 보내는 것이라
+    지금 동의한 시각을 consentedAt에 적고 새 키를 만든다."""
     api = env.get("TRACE_API_URL", "").rstrip("/")
     if (code := _check_api(api, args.code)) is not None:
         return code
@@ -135,8 +141,10 @@ def _resend(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str
         print("올리지 않았어요.")
         return 0
     key_file = _key_file(args.file)
-    # 빈 키 파일이면 새 키를 만들고, 실패하면 _save가 그 키를 다시 남긴다
-    key = (key_file.read_text(encoding="utf-8").strip() if key_file.exists() else "") or str(uuid.uuid4())
+    key = key_file.read_text(encoding="utf-8").strip() if key_file.exists() else ""
+    if not key:
+        doc["consentedAt"] = clock()
+        key = str(uuid.uuid4())  # 실패하면 _upload의 _save가 이 키를 남긴다
     return _upload(api, args.code, doc, args.file, post, sleep, key)
 
 
@@ -160,7 +168,7 @@ def main(argv: list[str] | None = None, *, env: Mapping[str, str] | None = None,
     args = parser.parse_args(args_list)
     environ = os.environ if env is None else env
     if args.command == "upload":
-        return _resend(args, environ, ask, post, sleep)
+        return _resend(args, environ, ask, post, sleep, clock)
     args.system = system  # win32면 Windows 수집기(AG2), 그 밖은 macOS 수집기
     return _run(args, environ, ask, run, post, workloads, clock, sleep)
 
