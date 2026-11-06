@@ -26,11 +26,21 @@ def _key_file(out: Path) -> Path:
     return out.with_name(out.name + ".key")
 
 
+def _write_atomic(path: Path, text: str) -> None:
+    """임시 파일에 다 쓴 뒤 바꿔 끼운다. 쓰다 실패해도 원래 파일은 그대로 남는다."""
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def _save(doc: dict[str, Any], out: Path, idempotency_key: str | None = None) -> None:
-    out.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_atomic(out, json.dumps(doc, ensure_ascii=False, indent=2))
     if idempotency_key:
         # 다시 올릴 때 같은 키를 써야, 사실은 저장됐는데 응답만 못 받은 경우에도 409 대신 처음 응답을 받는다
-        _key_file(out).write_text(idempotency_key, encoding="utf-8")
+        _write_atomic(_key_file(out), idempotency_key)
     else:
         # 키 없이 새로 남긴 진단에 지난 진단의 키가 붙어 엉뚱한 응답을 받지 않게 지운다
         _key_file(out).unlink(missing_ok=True)

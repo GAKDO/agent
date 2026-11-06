@@ -48,8 +48,11 @@ def http_post(url: str, body: dict[str, Any], headers: dict[str, str]) -> tuple[
     except urllib.error.HTTPError as err:
         try:
             body = json.loads(err.read() or b"{}")
-        except json.JSONDecodeError:
+        except ValueError:  # JSONDecodeError·UnicodeDecodeError 모두
             body = {}
+        except OSError as read_err:
+            # 오류 본문을 읽다 끊겨도 같은 키로 다시 올릴 수 있게 저장 경로로 넘긴다
+            raise UploadError(0, "BAD_RESPONSE", str(read_err)) from read_err
         if not isinstance(body, dict):
             body = {}
         if (retry := err.headers.get("Retry-After")) is not None:
@@ -57,8 +60,8 @@ def http_post(url: str, body: dict[str, Any], headers: dict[str, str]) -> tuple[
         return err.code, body
     except urllib.error.URLError as err:
         raise UploadError(0, "UNREACHABLE", str(err.reason)) from err
-    except (OSError, json.JSONDecodeError) as err:
-        # 응답을 읽다 끊기거나(시간 초과 포함) 본문이 JSON이 아니면, 서버가 처리했을 수 있으니 같은 키로 다시 올리게 한다
+    except (OSError, ValueError) as err:
+        # 응답을 읽다 끊기거나(시간 초과 포함) 본문이 JSON·UTF-8이 아니면, 서버가 처리했을 수 있으니 같은 키로 다시 올리게 한다
         raise UploadError(0, "BAD_RESPONSE", str(err)) from err
 
 

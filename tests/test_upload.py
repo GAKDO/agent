@@ -213,8 +213,10 @@ def test_키_없이_올리는_JSON은_보내기_전에_본문과_키를_함께_�
 
     def post(url: str, body: dict, headers: dict) -> tuple[int, dict]:
         if url.endswith("/runs"):
-            seen.append(((tmp_path / "diag.json.key").read_text(),
-                         json.loads((tmp_path / "diag.json").read_text(encoding="utf-8"))))
+            key = (tmp_path / "diag.json.key").read_text()
+            saved = json.loads((tmp_path / "diag.json").read_text(encoding="utf-8"))
+            assert key == headers["Idempotency-Key"] and saved == body  # 남긴 것과 보낸 것이 같아야 다시 올릴 수 있다
+            seen.append((key, saved))
         return FakeServer()(url, body, headers)
 
     argv = ["upload", "--file", str(tmp_path / "diag.json"), "--code", "482913"]
@@ -233,6 +235,52 @@ def test_응답_본문이_JSON이_아니면_UploadError로_바꾼다(monkeypatch
     class Resp(io.BytesIO):
         status = 200
 
-    monkeypatch.setattr(urllib.request, "urlopen", lambda *_a, **_k: Resp(b"<html>"))
+    for raw in (b"<html>", b"\xff"):
+        monkeypatch.setattr(urllib.request, "urlopen", lambda *_a, _raw=raw, **_k: Resp(_raw))
+        with pytest.raises(upload.UploadError):
+            upload.http_post("https://api.test/x", {}, {})
+
+
+def test_오류_본문을_읽다_끊기면_UploadError로_바꾼다(monkeypatch):
+    import io
+    import urllib.error
+    import urllib.request
+
+    from trace_agent import upload
+
+    class Broken(urllib.error.HTTPError):
+        def read(self, *_a) -> bytes:  # type: ignore[override]
+            raise ConnectionResetError("끊김")
+
+    def raise_http(*_a, **_k):
+        raise Broken("https://api.test/x", 503, "x", {}, io.BytesIO(b""))  # type: ignore[arg-type]
+
+    monkeypatch.setattr(urllib.request, "urlopen", raise_http)
     with pytest.raises(upload.UploadError):
         upload.http_post("https://api.test/x", {}, {})
+
+
+def test_저장이_실패해도_기존_진단_JSON은_그대로_남는다(tmp_path, monkeypatch):
+    from trace_agent import __main__ as cli
+
+    out = tmp_path / "diag.json"
+    out.write_text('{"old": true}', encoding="utf-8")
+    monkeypatch.setattr(cli.os, "replace", lambda *_a: (_ for _ in ()).throw(OSError("공간 부족")))
+    with pytest.raises(OSError):
+        cli._save({"new": True}, out, "k")
+    assert out.read_text(encoding="utf-8") == '{"old": true}'
+    assert not (tmp_path / "diag.json.tmp").exists()
+
+
+def test_잘못_인코딩된_오류_응답은_빈_본문으로_읽는다(monkeypatch):
+    import io
+    import urllib.error
+    import urllib.request
+
+    from trace_agent import upload
+
+    def raise_http(*_a, **_k):
+        raise urllib.error.HTTPError("https://api.test/x", 503, "x", {}, io.BytesIO(b"\xff"))  # type: ignore[arg-type]
+
+    monkeypatch.setattr(urllib.request, "urlopen", raise_http)
+    assert upload.http_post("https://api.test/x", {}, {}) == (503, {})
