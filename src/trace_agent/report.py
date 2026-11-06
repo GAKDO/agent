@@ -74,6 +74,11 @@ def summary(doc: dict[str, Any], checks: dict[str, Any] | None = None) -> str:
         f"OS: {doc['os']['type']} {doc['os']['version']} {doc['os']['arch']}",
         "부품: " + ", ".join(f"{x['kind']} {x['identifier']}" for x in doc["components"]),
     ]
+    # 올라가는 부품 식별값(시리얼·부품 번호)도 동의 전에 그대로 보인다
+    ids = [f"{x['kind']} " + " ".join(f"{k} {x['detail'][k]}" for k in ("serial", "partNumber") if x["detail"].get(k))
+           for x in doc["components"] if any(x["detail"].get(k) for k in ("serial", "partNumber"))]
+    if ids:
+        lines.append("부품 식별값: " + "; ".join(ids))
     if b["status"] == "OK":
         lines.append(
             f"배터리: 사이클 {b['cycleCount'] if b['cycleCount'] is not None else '모름'}, "

@@ -88,3 +88,10 @@ def test_BitLocker가_켜져_있으면_경고하고_관리자_권한이_없으�
     denied = windows.collect(WinRunner())["checks"]  # 고정 파일 없음 = 권한 없음과 같다
     assert denied == {"bitLocker": None, "warnings": []}
     assert "BitLocker 모름" in report.summary(_doc(windows.collect(WinRunner())), denied)
+
+
+def test_동의_전_요약에_올라가는_부품_시리얼과_부품_번호가_보인다():
+    collected = windows.collect(WinRunner({windows.MEMORY: Output(windows.MEMORY, 0, json.dumps(
+        [{"Capacity": 8589934592, "SerialNumber": "A1B2", "PartNumber": "M425R1GB4BB0"}]))}))
+    text = report.summary(_doc(collected))
+    assert "RAM serial A1B2 partNumber M425R1GB4BB0" in text and "SSD serial SSDTEST01" in text

@@ -157,3 +157,25 @@ def test_https가_아닌_주소면_경고하고_localhost는_경고하지_않는
              ask=lambda _q: "n", run=FixtureRunner(), post=FakeServer(), workloads=fast_workloads(), clock=clock(),
              system="darwin")
         assert ("https가 아니라" in capsys.readouterr().err) is warned
+
+
+def test_동의_질문_바로_위에_보낼_곳과_평문_여부를_보이고_교환보다_먼저_알린다(tmp_path, capsys):
+    seen: list[str] = []
+
+    def post(url: str, body: dict, headers: dict) -> tuple[int, dict]:
+        seen.append(capsys.readouterr().out)  # 첫 요청 전까지 화면에 나온 글
+        return FakeServer()(url, body, headers)
+
+    main(["run", "--out", str(tmp_path / "d.json"), "--code", "482913"], env={"TRACE_API_URL": "http://gakdo.example"},
+         ask=lambda _q: "y", run=FixtureRunner(), post=post, workloads=fast_workloads(), clock=clock(), system="darwin")
+    assert "보낼 곳: http://gakdo.example (암호화되지 않음" in seen[0]
+
+
+def test_빈_키_파일이면_새_키로_올리고_실패하면_그_키를_남긴다(tmp_path):
+    run_cli(FakeServer(503, {"code": "UNAVAILABLE"}), "y", tmp_path)
+    (tmp_path / "diag.json.key").write_text("")
+    server = FakeServer(503, {"code": "UNAVAILABLE"})
+    argv = ["upload", "--file", str(tmp_path / "diag.json"), "--code", "482913"]
+    assert main(argv, env=ENV, ask=lambda _q: "y", post=server, sleep=lambda _s: None) == 1
+    sent = server.requests[-1][2]["Idempotency-Key"]
+    assert sent and (tmp_path / "diag.json.key").read_text() == sent

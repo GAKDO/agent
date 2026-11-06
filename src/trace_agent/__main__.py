@@ -34,6 +34,11 @@ def _save(doc: dict[str, Any], out: Path, idempotency_key: str | None = None) ->
     print(f"진단 JSON을 {out}에 남겼어요.")
 
 
+def _target(api: str) -> str:
+    """동의 질문 바로 위에 보일 전송 대상. 평문이면 그 자리에서 다시 알린다."""
+    return f"보낼 곳: {api} ({'암호화되지 않음, 토큰과 시리얼이 그대로 나가요' if upload.insecure(api) else '암호화(https)'})"
+
+
 def _check_api(api: str, code: str | None) -> int | None:
     """코드·주소를 확인한다. 문제가 있으면 끝낼 코드, 없으면 None."""
     if code is None:
@@ -96,6 +101,7 @@ def _run(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str], 
         _save(doc, args.out)
         print("페어링 코드가 없어 올리지 않았어요.")
         return 0
+    print(_target(api))
     if ask("\n이 결과를 올릴까요? [y/N] ").strip().lower() != "y":
         print("올리지 않았어요.")
         return 0
@@ -118,11 +124,13 @@ def _resend(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str
         print("진단 결과가 스키마와 맞지 않아 올리지 않아요:\n  " + "\n  ".join(problems), file=sys.stderr)
         return 1
     print(report.summary(doc))
+    print(_target(api))
     if ask("\n이 결과를 올릴까요? [y/N] ").strip().lower() != "y":
         print("올리지 않았어요.")
         return 0
     key_file = _key_file(args.file)
-    key = key_file.read_text(encoding="utf-8").strip() if key_file.exists() else str(uuid.uuid4())
+    # 빈 키 파일이면 새 키를 만들고, 실패하면 _save가 그 키를 다시 남긴다
+    key = (key_file.read_text(encoding="utf-8").strip() if key_file.exists() else "") or str(uuid.uuid4())
     return _upload(api, args.code, doc, args.file, post, sleep, key)
 
 
