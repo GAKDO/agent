@@ -23,7 +23,7 @@ trace-agent run --code 482913      # 관리자 화면의 페어링 코드: 결�
 ## 실행 (Windows)
 
 PowerShell을 **관리자 권한으로** 열어야 SSD 수명 값을 읽는다(아니면 SSD는 "생략, NO_PERMISSION").
-smartmontools가 없으면 Windows 기본 기능(`Get-StorageReliabilityCounter`)으로 사용률(Wear)·가동 시간만 읽는다(예비·경고·미디어 오류는 null).
+smartmontools가 없으면 Windows 기본 기능(`Get-StorageReliabilityCounter`, 관리자 권한)으로 사용률(Wear)·가동 시간만 읽는다(예비·경고·미디어 오류는 null). 가동 시간을 못 주는 드라이버는 Wear도 0으로 채우므로(갤럭시 북 실측: smartctl 4%, Wear 0) 그때는 SSD를 "읽지 못함(UNSUPPORTED)"으로 둔다. 정확한 값은 smartmontools를 설치해서 읽는다.
 
 ```powershell
 winget install Python.Python.3.12 Git.Git GitHub.cli smartmontools.smartmontools
