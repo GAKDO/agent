@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from conftest import FixtureRunner
 
 from trace_agent import macos, report
@@ -204,3 +205,34 @@ def test_키_없이_처음_올리는_JSON은_동의한_시각을_consentedAt에_
                 clock=lambda: "2026-11-02T12:00:00+09:00") == 0
     doc = server.requests[-1][1]
     assert doc["consentedAt"] == "2026-11-02T12:00:00+09:00" and doc["collectedAt"] == "2026-11-02T11:00:00+09:00"
+
+
+def test_키_없이_올리는_JSON은_보내기_전에_본문과_키를_함께_남긴다(tmp_path):
+    assert run_cli(FakeServer(), "y", tmp_path, code=None) == 0
+    seen: list[tuple[str, dict]] = []
+
+    def post(url: str, body: dict, headers: dict) -> tuple[int, dict]:
+        if url.endswith("/runs"):
+            seen.append(((tmp_path / "diag.json.key").read_text(),
+                         json.loads((tmp_path / "diag.json").read_text(encoding="utf-8"))))
+        return FakeServer()(url, body, headers)
+
+    argv = ["upload", "--file", str(tmp_path / "diag.json"), "--code", "482913"]
+    assert main(argv, env=ENV, ask=lambda _q: "y", post=post, sleep=lambda _s: None,
+                clock=lambda: "2026-11-02T12:00:00+09:00") == 0
+    key, saved = seen[0]
+    assert key and saved["consentedAt"] == "2026-11-02T12:00:00+09:00"
+
+
+def test_응답_본문이_JSON이_아니면_UploadError로_바꾼다(monkeypatch):
+    import io
+    import urllib.request
+
+    from trace_agent import upload
+
+    class Resp(io.BytesIO):
+        status = 200
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *_a, **_k: Resp(b"<html>"))
+    with pytest.raises(upload.UploadError):
+        upload.http_post("https://api.test/x", {}, {})

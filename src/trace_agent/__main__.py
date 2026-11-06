@@ -144,7 +144,8 @@ def _resend(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str
     key = key_file.read_text(encoding="utf-8").strip() if key_file.exists() else ""
     if not key:
         doc["consentedAt"] = clock()
-        key = str(uuid.uuid4())  # 실패하면 _upload의 _save가 이 키를 남긴다
+        key = str(uuid.uuid4())
+        _save(doc, args.file, key)  # 보내기 전에 바뀐 본문과 키를 함께 남겨, 어디서 끊겨도 다음에 같은 키로 올린다
     return _upload(api, args.code, doc, args.file, post, sleep, key)
 
 

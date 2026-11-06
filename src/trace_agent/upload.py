@@ -57,6 +57,9 @@ def http_post(url: str, body: dict[str, Any], headers: dict[str, str]) -> tuple[
         return err.code, body
     except urllib.error.URLError as err:
         raise UploadError(0, "UNREACHABLE", str(err.reason)) from err
+    except (OSError, json.JSONDecodeError) as err:
+        # 응답을 읽다 끊기거나(시간 초과 포함) 본문이 JSON이 아니면, 서버가 처리했을 수 있으니 같은 키로 다시 올리게 한다
+        raise UploadError(0, "BAD_RESPONSE", str(err)) from err
 
 
 def _fail(status: int, body: dict[str, Any]) -> UploadError:
