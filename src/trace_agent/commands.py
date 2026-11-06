@@ -20,6 +20,8 @@ MACOS: tuple[tuple[str, ...], ...] = (
     ("smartctl", "-j", "-a", "disk0"),
     ("ps", "-A", "-o", "pid="),
     ("sysctl", "-n", "kern.boottime"),
+    # 반납 점검 경고용(올리지 않음): FileVault 켜짐 여부만 한 줄로 준다
+    ("fdesetup", "status"),
 )
 
 
@@ -33,7 +35,7 @@ WINDOWS: dict[str, tuple[str, ...]] = {
     "SYSTEM": _ps("Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer,Model,SystemFamily" + _JSON),
     "BIOS": _ps("Get-CimInstance Win32_BIOS | Select-Object SerialNumber" + _JSON),
     "CPU": _ps("Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors" + _JSON),
-    "MEMORY": _ps("Get-CimInstance Win32_PhysicalMemory | Select-Object Capacity" + _JSON),
+    "MEMORY": _ps("Get-CimInstance Win32_PhysicalMemory | Select-Object Capacity,SerialNumber,PartNumber" + _JSON),
     "DISKS": _ps("Get-PhysicalDisk | Select-Object FriendlyName,SerialNumber,Size,MediaType,BusType,HealthStatus" + _JSON),
     "VIDEO": _ps("Get-CimInstance Win32_VideoController | "
                  "Select-Object Name,CurrentHorizontalResolution,CurrentVerticalResolution" + _JSON),
@@ -46,13 +48,18 @@ WINDOWS: dict[str, tuple[str, ...]] = {
     "BATTERY_STATUS": _ps("Get-CimInstance -Namespace root/wmi BatteryStatus | Select-Object PowerOnline" + _JSON),
     # BatteryStaticData가 "일반 오류"인 기기(갤럭시 북 등)는 Windows 배터리 리포트에서 같은 mWh 값을 읽는다
     "BATTERY_REPORT": _ps("powercfg /batteryreport /xml /output $env:TEMP\\trace-battery.xml | Out-Null"),
-    "BATTERY_REPORT_READ": _ps("([xml](gc $env:TEMP\\trace-battery.xml)).BatteryReport.Batteries.Battery | "
-                               "Select-Object DesignCapacity,FullChargeCapacity,CycleCount" + _JSON),
+    # sources 한 줄 200자 제한(diag.v1) 때문에 파이프 앞뒤 공백을 뺀다
+    "BATTERY_REPORT_READ": _ps("([xml](gc $env:TEMP\\trace-battery.xml)).BatteryReport.Batteries.Battery|"
+                               "select DesignCapacity,FullChargeCapacity,CycleCount,SerialNumber|ConvertTo-Json"),
     "PROCESSES": _ps("(Get-Process).Count"),
     "UPTIME": _ps("[int]((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalSeconds"),
     # smartctl이 없으면 Windows 기본 기능으로 내장 디스크(첫 번째 USB 아닌 디스크)의 마모도·가동 시간(관리자 권한 필요)
     "RELIABILITY": _ps("Get-PhysicalDisk | ? BusType -ne USB | select -First 1 | "
                        "Get-StorageReliabilityCounter | select Wear,PowerOnHours" + _JSON),
+    # 반납 점검 경고용(올리지 않음): BitLocker 보호 상태(관리자 권한 필요, 없으면 '모름')
+    # sources 한 줄 200자 제한(diag.v1) 때문에 줄인 별칭(gcim·select)을 쓴다
+    "BITLOCKER": _ps("gcim -N root/cimv2/Security/MicrosoftVolumeEncryption Win32_EncryptableVolume | "
+                     "select DriveLetter,ProtectionStatus" + _JSON),
     "SMARTCTL": ("smartctl", "-j", "-a", "/dev/sda"),
     "SMARTCTL_DEFAULT_PATH": (r"C:\Program Files\smartmontools\bin\smartctl.exe", "-j", "-a", "/dev/sda"),
 }

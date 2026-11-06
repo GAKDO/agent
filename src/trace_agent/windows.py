@@ -23,7 +23,7 @@ BATTERY, BATTERY_STATIC, BATTERY_FULL, BATTERY_CYCLE, BATTERY_STATUS = (
 PROCESSES, UPTIME, SMARTCTL, SMARTCTL_DEFAULT_PATH = (
     WINDOWS[k] for k in ("PROCESSES", "UPTIME", "SMARTCTL", "SMARTCTL_DEFAULT_PATH"))
 BATTERY_REPORT, BATTERY_REPORT_READ = WINDOWS["BATTERY_REPORT"], WINDOWS["BATTERY_REPORT_READ"]
-RELIABILITY = WINDOWS["RELIABILITY"]
+RELIABILITY, BITLOCKER = WINDOWS["RELIABILITY"], WINDOWS["BITLOCKER"]
 REPORT_FILE = "trace-battery.xml"  # %TEMP% 안. 읽은 뒤 지운다
 
 # Get-PhysicalDisk는 PowerShell 버전에 따라 숫자나 글자로 준다
@@ -32,6 +32,11 @@ _BUS = {7: "USB", 11: "SATA", 17: "NVMe"}
 _HEALTH = {0: "Healthy", 1: "Warning", 2: "Unhealthy", 5: "Unknown"}
 _SKIP_NULLS = ("cycleCount", "designCapacity", "fullChargeCapacity", "osMaxCapacityPercent", "osCondition")
 _PLACEHOLDER_SERIALS = {"", "to be filled by o.e.m.", "default string", "system serial number", "0", "none"}
+
+
+def _real_serial(value: str) -> bool:
+    """제조사가 채우지 않은 자리표시 시리얼(00000000 등)은 부품 비교에 쓰지 않는다."""
+    return value.lower() not in _PLACEHOLDER_SERIALS and set(value) != {"0"}
 
 
 def rows(text: str) -> list[dict[str, Any]]:
@@ -77,10 +82,19 @@ def parse_cpu(text: str) -> list[dict[str, Any]]:
 
 
 def parse_memory(text: str) -> list[dict[str, Any]]:
-    total = sum(_int(m.get("Capacity")) or 0 for m in rows(text))
+    """RAM은 하나의 부품으로 묶되, 모듈 시리얼을 detail.serial에 모아 같은 용량 모듈로 바꿔 끼운 것도 서버가 잡게 한다."""
+    modules = rows(text)
+    total = sum(_int(m.get("Capacity")) or 0 for m in modules)
     if not total:
         return []
-    return [{"kind": "RAM", "identifier": f"{round(total / 1024**3)} GB", "detail": {"totalBytes": total}}]
+    detail: dict[str, Any] = {"totalBytes": total, "modules": len(modules)}
+    serials = sorted(s for m in modules if _real_serial(s := _str(m.get("SerialNumber"), 32)))
+    if serials:
+        detail["serial"] = ",".join(serials)[:128]
+    parts = sorted({p for m in modules if (p := _str(m.get("PartNumber"), 32))})
+    if parts:
+        detail["partNumber"] = ",".join(parts)[:128]
+    return [{"kind": "RAM", "identifier": f"{round(total / 1024**3)} GB", "detail": detail}]
 
 
 def parse_disks(text: str) -> list[dict[str, Any]]:
@@ -149,7 +163,9 @@ def parse_battery(battery: Output, static: Output, full: Output, cycle: Output, 
     }
     first = statics[0] if statics else {}
     name = _str(first.get("DeviceName"), 128) or _str(rows(battery.stdout)[0].get("Name"), 128) or "Battery"
-    serial = _str(first.get("SerialNumber"), 64)
+    # BatteryStaticData가 실패하는 기기(갤럭시 북 등)는 배터리 리포트의 시리얼로 배터리 교체를 잡는다
+    serial = _str(first.get("SerialNumber"), 64) or next(
+        (s for r in reports if _real_serial(s := _str(r.get("SerialNumber"), 64))), "")
     return result, {"kind": "BATTERY", "identifier": name, "detail": {"serial": serial} if serial else {}}
 
 
@@ -220,6 +236,18 @@ def parse_reliability(out: Output, disks: str) -> dict[str, Any]:
             "powerOnHours": hours if hours >= 0 else None}
 
 
+def parse_checks(bitlocker: Output) -> dict[str, Any]:
+    """반납·출고 전 경고(올리지 않고 요약에만). BitLocker가 켜져 있으면 복구 키 없이 디스크를 못 연다.
+    관리자 권한이 없으면 읽지 못해 '모름'."""
+    volumes = rows(bitlocker.stdout) if bitlocker.ok else []
+    system = next((v for v in volumes if str(v.get("DriveLetter") or "").upper().startswith("C")), None)
+    if system is None:
+        return {"bitLocker": None, "warnings": []}
+    on = _int(system.get("ProtectionStatus")) == 1
+    warnings = ["BitLocker가 켜져 있어요. 복구 키가 회사 계정에 있는지 확인하고 초기화해 주세요"] if on else []
+    return {"bitLocker": "켜짐" if on else "꺼짐", "warnings": warnings}
+
+
 def _os_version() -> str:
     """Windows는 platform.version()이 빌드 번호(10.0.22631)다. 다른 OS에서 테스트할 때는 release로 대신한다."""
     version = platform.version() if sys.platform == "win32" else platform.release()
@@ -229,7 +257,8 @@ def _os_version() -> str:
 def collect(run: Runner) -> dict[str, Any]:
     """고정 목록 명령을 돌려 진단 JSON 조각(벤치마크·시각 제외)을 만든다."""
     outs = {argv: run(argv) for argv in (SYSTEM, BIOS, CPU, MEMORY, DISKS, VIDEO, BATTERY, BATTERY_STATIC,
-                                         BATTERY_FULL, BATTERY_CYCLE, BATTERY_STATUS, PROCESSES, UPTIME, SMARTCTL)}
+                                         BATTERY_FULL, BATTERY_CYCLE, BATTERY_STATUS, PROCESSES, UPTIME, SMARTCTL,
+                                         BITLOCKER)}
     report = None
     if _needs_report(outs):
         outs[BATTERY_REPORT] = run(BATTERY_REPORT)
@@ -261,4 +290,5 @@ def collect(run: Runner) -> dict[str, Any]:
         "battery": battery,
         "storage": storage,
         "sources": [o.source for o in outs.values()],
+        "checks": parse_checks(outs[BITLOCKER]),  # 요약에만 쓰고 올리지 않는다
     }

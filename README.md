@@ -14,7 +14,10 @@ brew install smartmontools        # SSD 수명 값(없으면 SSD는 "생략, TOO
 export TRACE_API_URL=https://<gateway 주소>
 trace-agent run                    # 진단만 하고 결과를 보여 주고 trace-diagnostics.json에 남김
 trace-agent run --code 482913      # 관리자 화면의 페어링 코드: 결과를 본 뒤 y를 넣어야 올림
+trace-agent upload --code 123456   # 올리지 못했을 때: 남긴 JSON을 새 코드로 다시 올림(같은 Idempotency-Key)
 ```
+
+- 요약 끝의 `잠금(올리지 않음)`·`[주의]` 줄은 반납·출고 때 직원이 바로 볼 경고다. 활성화 잠금(나의 Mac 찾기)·FileVault·BitLocker가 켜져 있으면 초기화 전에 고객에게 해제를 요청한다. 계약(diag.v1)에 칸이 없어 서버로는 보내지 않는다
 
 - 전원 어댑터를 꽂아야 벤치마크(약 1분)를 돌린다. 꽂지 않으면 벤치마크 없이 사유(NO_AC_POWER)만 남는다.
 - 읽는 명령은 `src/trace_agent/commands.py`의 `ALLOWED` 목록뿐이다. 사용자 파일·브라우저 기록은 읽지 않고, 컴퓨터 이름·플랫폼 UUID는 보내지 않는다.
