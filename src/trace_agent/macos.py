@@ -25,6 +25,7 @@ PMSET_THERM = ("pmset", "-g", "therm")
 SMARTCTL = ("smartctl", "-j", "-a", "disk0")
 PS = ("ps", "-A", "-o", "pid=")
 BOOTTIME = ("sysctl", "-n", "kern.boottime")
+FILEVAULT = ("fdesetup", "status")
 
 _SKIP_NULLS = ("cycleCount", "designCapacity", "fullChargeCapacity", "osMaxCapacityPercent", "osCondition")
 _SSD_NULLS = ("protocol", "percentageUsed", "availableSpare", "criticalWarning", "mediaErrors", "powerOnHours")
@@ -87,13 +88,43 @@ def parse_nvme(text: str) -> list[dict[str, Any]]:
 
 
 def parse_displays(text: str) -> list[dict[str, Any]]:
+    """내장 화면만. 외부 모니터를 꽂고 진단하면 화면 묶음이 달라져 서버가 '부품 변경'으로 잘못 플래그하기 때문이다.
+    연결 종류를 주지 않는 옛 macOS는 모두 남긴다. 화면 시리얼은 지금처럼 보내지 않는다."""
     screens = [s for gpu in _sp_items(text, "SPDisplaysDataType") for s in gpu.get("spdisplays_ndrvs", [])]
+    if any("spdisplays_connection_type" in s for s in screens):
+        screens = [s for s in screens if s.get("spdisplays_connection_type") == "spdisplays_internal"]
     out = []
     for s in screens:
         pixels = re.sub(r"\s*x\s*", "x", s.get("_spdisplays_pixels", "")).strip()
         out.append({"kind": "DISPLAY", "identifier": s.get("_name") or "Display",
                     "detail": {"resolution": pixels} if pixels else {}})
     return out
+
+
+def parse_checks(hardware: str, filevault: str, nvme: str) -> list[str]:
+    """반납·출고 전에 직원이 바로 봐야 할 경고(올리지 않고 요약에만). 계약(diag.v1)에 칸이 없어 화면에서만 알린다.
+    - 활성화 잠금(나의 Mac 찾기)이 켜져 있으면 초기화 뒤 고객 Apple ID 없이는 다시 못 쓴다
+    - FileVault가 켜져 있으면 고객 암호 없이 디스크를 못 연다"""
+    warnings = []
+    hw = (_sp_items(hardware, "SPHardwareDataType") or [{}])[0]
+    lock = str(hw.get("activation_lock_status") or "")
+    if lock.endswith("_enabled"):
+        warnings.append("활성화 잠금(나의 Mac 찾기)이 켜져 있어요. 고객이 iCloud에서 기기를 지워야 다시 대여할 수 있어요")
+    if "FileVault is On" in filevault:
+        warnings.append("FileVault가 켜져 있어요. 초기화 전에 고객이 끄거나 관리자 암호를 알려 줘야 해요")
+    disks = [d for ctrl in _sp_items(nvme, "SPNVMeDataType") for d in ctrl.get("_items", [])]
+    for d in disks:
+        status = str(d.get("smart_status") or "")
+        if status and status.lower() != "verified":
+            warnings.append(f"OS가 본 SSD SMART 상태가 '{status}'예요. SSD 점검이 필요해요")
+    return warnings
+
+
+def lock_status(hardware: str) -> str | None:
+    """요약에 보일 활성화 잠금 상태. 못 읽으면 None."""
+    hw = (_sp_items(hardware, "SPHardwareDataType") or [{}])[0]
+    lock = str(hw.get("activation_lock_status") or "")
+    return {"activation_lock_enabled": "켜짐", "activation_lock_disabled": "꺼짐"}.get(lock)
 
 
 def parse_ioreg_battery(data: bytes) -> dict[str, Any] | None:
@@ -185,7 +216,7 @@ def parse_conditions(batt: str, therm: str, ps: str, boottime: str, now: float) 
 def collect(run: Runner, now: float | None = None) -> dict[str, Any]:
     """고정 목록 명령을 돌려 진단 JSON 조각(벤치마크·시각 제외)을 만든다."""
     outs = {argv: run(argv) for argv in (HARDWARE, POWER, NVME, DISPLAYS, IOREG_BATTERY, PMSET_BATT,
-                                         PMSET_THERM, SMARTCTL, PS, BOOTTIME)}
+                                         PMSET_THERM, SMARTCTL, PS, BOOTTIME, FILEVAULT)}
 
     def text(argv: tuple[str, ...]) -> str:
         return outs[argv].stdout if outs[argv].ok else ""
@@ -205,6 +236,11 @@ def collect(run: Runner, now: float | None = None) -> dict[str, Any]:
         "battery": battery,
         "storage": parse_smartctl(outs[SMARTCTL]),
         "sources": [o.source for o in outs.values()],
+        # 아래는 요약에만 쓰고 올리지 않는다(report.assemble이 넣지 않음)
+        "checks": {"activationLock": lock_status(text(HARDWARE)),
+                   "fileVault": ("켜짐" if "FileVault is On" in text(FILEVAULT)
+                                 else "꺼짐" if "FileVault is Off" in text(FILEVAULT) else None),
+                   "warnings": parse_checks(text(HARDWARE), text(FILEVAULT), text(NVME))},
     }
 
 

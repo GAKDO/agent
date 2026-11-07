@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from conftest import FixtureRunner
 
 from trace_agent import macos, report
@@ -95,3 +96,214 @@ def test_전원이_없으면_명령줄에서도_벤치마크를_돌리지_않는
          post=FakeServer(), workloads=workloads, clock=clock(), system="darwin")
     assert called == []
     assert json.loads((tmp_path / "d.json").read_text())["benchmarkSkippedReason"] == "NO_AC_POWER"
+
+
+class RateLimitedServer(FakeServer):
+    """처음 교환은 429(Retry-After 3)로 막고, 그다음부터 받아 준다. 교환 응답에 기기 시리얼을 준다."""
+
+    def __init__(self, device_serial: str = "C02TEST00001", **kw) -> None:
+        super().__init__(**kw)
+        self.device_serial, self.limited = device_serial, True
+
+    def __call__(self, url: str, body: dict, headers: dict) -> tuple[int, dict]:
+        self.requests.append((url, body, headers))
+        if url.endswith("/pairing-codes/exchange"):
+            if self.limited:
+                self.limited = False
+                return 429, {"code": "RATE_LIMITED", "retryAfter": "3"}
+            return 200, {"accessToken": TOKEN, "deviceSerial": self.device_serial}
+        return self.upload_status, self.upload_body
+
+
+def _cli(server, tmp_path, slept: list, argv: list[str] | None = None) -> int:
+    argv = argv or ["run", "--out", str(tmp_path / "diag.json"), "--code", "482913"]
+    return main(argv, env=ENV, ask=lambda _q: "y", run=FixtureRunner(), post=server, workloads=fast_workloads(),
+                clock=clock(), system="darwin", sleep=slept.append)
+
+
+def test_교환이_429면_Retry_After만큼_기다렸다_다시_시도해_올린다(tmp_path):
+    slept: list[float] = []
+    server = RateLimitedServer()
+    assert _cli(server, tmp_path, slept) == 0
+    assert slept == [3.0]
+    assert [u.rsplit("/", 1)[-1] for u, _, _ in server.requests] == ["exchange", "exchange", "runs"]
+
+
+def test_페어링_코드의_기기와_시리얼이_다르면_올리지_않고_알린다(tmp_path, capsys):
+    server = RateLimitedServer(device_serial="C02OTHER9999")
+    assert _cli(server, tmp_path, []) == 1
+    assert not any(u.endswith("/runs") for u, _, _ in server.requests)
+    err = capsys.readouterr().err
+    assert "끝 0001" in err and "끝 9999" in err and "C02TEST00001" not in err
+
+
+def test_올리지_못하면_JSON과_키를_남기고_upload_명령은_같은_키와_같은_내용으로_다시_올린다(tmp_path, capsys):
+    first = FakeServer(503, {"code": "UNAVAILABLE"})
+    assert run_cli(first, "y", tmp_path) == 1
+    saved_key = (tmp_path / "diag.json.key").read_text()
+    first_doc, first_key = first.requests[-1][1], first.requests[-1][2]["Idempotency-Key"]
+    assert saved_key == first_key and "trace-agent upload" in capsys.readouterr().err
+
+    again = FakeServer()
+    argv = ["upload", "--file", str(tmp_path / "diag.json"), "--code", "482913"]
+    assert main(argv, env=ENV, ask=lambda _q: "y", post=again, sleep=lambda _s: None) == 0
+    _, doc, headers = again.requests[-1]
+    assert headers["Idempotency-Key"] == first_key and doc == first_doc
+    assert not (tmp_path / "diag.json.key").exists()
+
+
+def test_https가_아닌_주소면_경고하고_localhost는_경고하지_않는다(tmp_path, capsys):
+    for api, warned in (("http://gakdo.example", True), ("http://localhost:8315", False)):
+        main(["run", "--out", str(tmp_path / "d.json"), "--code", "482913"], env={"TRACE_API_URL": api},
+             ask=lambda _q: "n", run=FixtureRunner(), post=FakeServer(), workloads=fast_workloads(), clock=clock(),
+             system="darwin")
+        assert ("https가 아니라" in capsys.readouterr().err) is warned
+
+
+def test_동의_질문_바로_위에_보낼_곳과_평문_여부를_보이고_교환보다_먼저_알린다(tmp_path, capsys):
+    seen: list[str] = []
+
+    def post(url: str, body: dict, headers: dict) -> tuple[int, dict]:
+        seen.append(capsys.readouterr().out)  # 첫 요청 전까지 화면에 나온 글
+        return FakeServer()(url, body, headers)
+
+    main(["run", "--out", str(tmp_path / "d.json"), "--code", "482913"], env={"TRACE_API_URL": "http://gakdo.example"},
+         ask=lambda _q: "y", run=FixtureRunner(), post=post, workloads=fast_workloads(), clock=clock(), system="darwin")
+    assert "보낼 곳: http://gakdo.example (암호화되지 않음" in seen[0]
+
+
+def test_빈_키_파일이면_새_키로_올리고_실패하면_그_키를_남긴다(tmp_path):
+    run_cli(FakeServer(503, {"code": "UNAVAILABLE"}), "y", tmp_path)
+    (tmp_path / "diag.json.key").write_text("")
+    server = FakeServer(503, {"code": "UNAVAILABLE"})
+    argv = ["upload", "--file", str(tmp_path / "diag.json"), "--code", "482913"]
+    assert main(argv, env=ENV, ask=lambda _q: "y", post=server, sleep=lambda _s: None) == 1
+    sent = server.requests[-1][2]["Idempotency-Key"]
+    assert sent and (tmp_path / "diag.json.key").read_text() == sent
+
+
+def test_보낼_곳의_암호화_표시는_주소의_스킴으로_정한다():
+    from trace_agent.__main__ import _target
+
+    assert "암호화(https)" in _target("https://api.test")
+    assert "암호화되지 않음, 이 컴퓨터 안에서만" in _target("http://localhost:8315")
+    assert "토큰과 시리얼이 그대로" in _target("http://gakdo.example")
+
+
+def test_코드_없이_새로_남긴_진단에는_지난_진단의_키가_남지_않는다(tmp_path):
+    run_cli(FakeServer(503, {"code": "UNAVAILABLE"}), "y", tmp_path)
+    assert (tmp_path / "diag.json.key").exists()
+    assert run_cli(FakeServer(), "y", tmp_path, code=None) == 0
+    assert not (tmp_path / "diag.json.key").exists()
+
+
+def test_키_없이_처음_올리는_JSON은_동의한_시각을_consentedAt에_적는다(tmp_path):
+    assert run_cli(FakeServer(), "y", tmp_path, code=None) == 0
+    server = FakeServer()
+    argv = ["upload", "--file", str(tmp_path / "diag.json"), "--code", "482913"]
+    assert main(argv, env=ENV, ask=lambda _q: "y", post=server, sleep=lambda _s: None,
+                clock=lambda: "2026-11-02T12:00:00+09:00") == 0
+    doc = server.requests[-1][1]
+    assert doc["consentedAt"] == "2026-11-02T12:00:00+09:00" and doc["collectedAt"] == "2026-11-02T11:00:00+09:00"
+
+
+def test_키_없이_올리는_JSON은_보내기_전에_본문과_키를_함께_남긴다(tmp_path):
+    assert run_cli(FakeServer(), "y", tmp_path, code=None) == 0
+    seen: list[tuple[str, dict]] = []
+
+    def post(url: str, body: dict, headers: dict) -> tuple[int, dict]:
+        if url.endswith("/runs"):
+            key = (tmp_path / "diag.json.key").read_text()
+            saved = json.loads((tmp_path / "diag.json").read_text(encoding="utf-8"))
+            assert key == headers["Idempotency-Key"] and saved == body  # 남긴 것과 보낸 것이 같아야 다시 올릴 수 있다
+            seen.append((key, saved))
+        return FakeServer()(url, body, headers)
+
+    argv = ["upload", "--file", str(tmp_path / "diag.json"), "--code", "482913"]
+    assert main(argv, env=ENV, ask=lambda _q: "y", post=post, sleep=lambda _s: None,
+                clock=lambda: "2026-11-02T12:00:00+09:00") == 0
+    key, saved = seen[0]
+    assert key and saved["consentedAt"] == "2026-11-02T12:00:00+09:00"
+
+
+def test_응답_본문이_JSON이_아니면_UploadError로_바꾼다(monkeypatch):
+    import io
+    import urllib.request
+
+    from trace_agent import upload
+
+    class Resp(io.BytesIO):
+        status = 200
+
+    for raw in (b"<html>", b"\xff"):
+        monkeypatch.setattr(urllib.request, "urlopen", lambda *_a, _raw=raw, **_k: Resp(_raw))
+        with pytest.raises(upload.UploadError):
+            upload.http_post("https://api.test/x", {}, {})
+
+
+def test_오류_본문을_읽다_끊기면_UploadError로_바꾼다(monkeypatch):
+    import io
+    import urllib.error
+    import urllib.request
+
+    from trace_agent import upload
+
+    class Broken(urllib.error.HTTPError):
+        def read(self, *_a) -> bytes:  # type: ignore[override]
+            raise ConnectionResetError("끊김")
+
+    def raise_http(*_a, **_k):
+        raise Broken("https://api.test/x", 503, "x", {}, io.BytesIO(b""))  # type: ignore[arg-type]
+
+    monkeypatch.setattr(urllib.request, "urlopen", raise_http)
+    with pytest.raises(upload.UploadError):
+        upload.http_post("https://api.test/x", {}, {})
+
+
+def test_저장이_실패해도_기존_진단_JSON은_그대로_남는다(tmp_path, monkeypatch):
+    from trace_agent import __main__ as cli
+
+    out = tmp_path / "diag.json"
+    out.write_text('{"old": true}', encoding="utf-8")
+    monkeypatch.setattr(cli.os, "replace", lambda *_a: (_ for _ in ()).throw(OSError("공간 부족")))
+    with pytest.raises(OSError):
+        cli._save({"new": True}, out, "k")
+    assert out.read_text(encoding="utf-8") == '{"old": true}'
+    assert not (tmp_path / "diag.json.tmp").exists()
+
+
+def test_잘못_인코딩된_오류_응답은_빈_본문으로_읽는다(monkeypatch):
+    import io
+    import urllib.error
+    import urllib.request
+
+    from trace_agent import upload
+
+    def raise_http(*_a, **_k):
+        raise urllib.error.HTTPError("https://api.test/x", 503, "x", {}, io.BytesIO(b"\xff"))  # type: ignore[arg-type]
+
+    monkeypatch.setattr(urllib.request, "urlopen", raise_http)
+    assert upload.http_post("https://api.test/x", {}, {}) == (503, {})
+
+
+def test_응답이_Content_Length보다_일찍_끝나면_UploadError로_바꾼다(monkeypatch):
+    import http.client
+    import urllib.request
+
+    from trace_agent import upload
+
+    class Short:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a) -> None:
+            return None
+
+        def read(self) -> bytes:
+            raise http.client.IncompleteRead(b"{", 10)
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *_a, **_k: Short())
+    with pytest.raises(upload.UploadError):
+        upload.http_post("https://api.test/x", {}, {})

@@ -65,14 +65,20 @@ def spread_percent(trials: list[float], median: float) -> float:
     return round((max(trials) - min(trials)) / 2 / median * 100, 1) if median else 0.0
 
 
-def summary(doc: dict[str, Any]) -> str:
-    """동의 전에 보여 줄 요약. 올라갈 값과 실행한 명령을 그대로 보인다."""
+def summary(doc: dict[str, Any], checks: dict[str, Any] | None = None) -> str:
+    """동의 전에 보여 줄 요약. 올라갈 값과 실행한 명령을 그대로 보인다.
+    checks(잠금 상태·경고)는 계약에 칸이 없어 올리지 않고 여기서만 보인다."""
     d, c, b, s = doc["device"], doc["conditions"], doc["battery"], doc["storage"]
     lines = [
         f"기기: {d['manufacturer']} {d.get('modelName') or d['model']} ({d['model']}), 시리얼 {d['serial']}",
         f"OS: {doc['os']['type']} {doc['os']['version']} {doc['os']['arch']}",
         "부품: " + ", ".join(f"{x['kind']} {x['identifier']}" for x in doc["components"]),
     ]
+    # 올라가는 부품 식별값(시리얼·부품 번호)도 동의 전에 그대로 보인다
+    ids = [f"{x['kind']} " + " ".join(f"{k} {x['detail'][k]}" for k in ("serial", "partNumber") if x["detail"].get(k))
+           for x in doc["components"] if any(x["detail"].get(k) for k in ("serial", "partNumber"))]
+    if ids:
+        lines.append("부품 식별값: " + "; ".join(ids))
     if b["status"] == "OK":
         lines.append(
             f"배터리: 사이클 {b['cycleCount'] if b['cycleCount'] is not None else '모름'}, "
@@ -89,7 +95,9 @@ def summary(doc: dict[str, Any]) -> str:
             f"가동 {_known(s['powerOnHours'], '시간')}"
         )
     else:
-        lines.append(f"SSD: 생략 (사유 {s['skippedReason']})")
+        smart = next((x["detail"].get("smartStatus") for x in doc["components"]
+                      if x["kind"] == "SSD" and x["detail"].get("smartStatus")), None)
+        lines.append(f"SSD: 생략 (사유 {s['skippedReason']})" + (f", OS SMART 상태 {smart}" if smart else ""))
     pct = "모름" if c["batteryPercent"] is None else f"{c['batteryPercent']}%"
     lines.append(f"조건: 전원 {'연결' if c['acPower'] else '없음'}, 잔량 {pct}, 발열 {c['thermalState'] or '모름'}")
     if doc["benchmarks"]:
@@ -98,5 +106,11 @@ def summary(doc: dict[str, Any]) -> str:
             for x in doc["benchmarks"]))
     else:
         lines.append(f"벤치마크: 돌리지 않음 (사유 {doc['benchmarkSkippedReason']})")
+    if checks:
+        locks = [f"{name} {checks[key] or '모름'}" for key, name in
+                 (("activationLock", "활성화 잠금"), ("fileVault", "FileVault"), ("bitLocker", "BitLocker")) if key in checks]
+        if locks:
+            lines.append("잠금(올리지 않음): " + ", ".join(locks))
+        lines += [f"[주의] {w}" for w in checks.get("warnings", [])]
     lines.append("실행한 명령: " + "; ".join(doc["sources"]))
     return "\n".join(lines)
