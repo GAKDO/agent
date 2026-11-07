@@ -7,7 +7,8 @@ main에 버전이 적힌 CHANGELOG가 올라가면 release.yml이 태그와 GitH
 ## [Unreleased]
 
 ### 추가
-- 반납 점검 경고(올리지 않고 요약에만): macOS 활성화 잠금·FileVault·OS SMART 상태, Windows BitLocker
+- 잠금·디스크 상태 올리기(contracts 11/7 추가): 진단 JSON에 `checks`{activationLock, diskEncryption, osDiskHealth}를 ON·OFF·OK·WARNING 코드로 실음. 못 읽으면 null
+- 반납 점검 경고(요약): macOS 활성화 잠금·FileVault·OS SMART 상태, Windows BitLocker
 - `trace-agent upload --code`: 올리지 못하고 남긴 JSON을 같은 Idempotency-Key로 다시 올림
 - 페어링 교환 429면 Retry-After만큼 기다려 두 번까지 다시 시도, 교환 응답의 기기 시리얼이 다르면 올리지 않고 알림
 - Windows: RAM 모듈 시리얼·부품 번호, 배터리 리포트의 배터리 시리얼(부품 교체 플래그용)

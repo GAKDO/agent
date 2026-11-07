@@ -102,7 +102,7 @@ def parse_displays(text: str) -> list[dict[str, Any]]:
 
 
 def parse_checks(hardware: str, filevault: str, nvme: str) -> list[str]:
-    """반납·출고 전에 직원이 바로 봐야 할 경고(올리지 않고 요약에만). 계약(diag.v1)에 칸이 없어 화면에서만 알린다.
+    """반납·출고 전에 직원이 바로 봐야 할 경고 문장(요약에만). 상태 값 자체는 계약 checks로 올라가고 서버가 플래그를 붙인다.
     - 활성화 잠금(나의 Mac 찾기)이 켜져 있으면 초기화 뒤 고객 Apple ID 없이는 다시 못 쓴다
     - FileVault가 켜져 있으면 고객 암호 없이 디스크를 못 연다"""
     warnings = []
@@ -112,12 +112,25 @@ def parse_checks(hardware: str, filevault: str, nvme: str) -> list[str]:
         warnings.append("활성화 잠금(나의 Mac 찾기)이 켜져 있어요. 고객이 iCloud에서 기기를 지워야 다시 대여할 수 있어요")
     if "FileVault is On" in filevault:
         warnings.append("FileVault가 켜져 있어요. 초기화 전에 고객이 끄거나 관리자 암호를 알려 줘야 해요")
-    disks = [d for ctrl in _sp_items(nvme, "SPNVMeDataType") for d in ctrl.get("_items", [])]
-    for d in disks:
-        status = str(d.get("smart_status") or "")
-        if status and status.lower() != "verified":
+    for status in _smart_statuses(nvme):
+        if status.lower() != "verified":
             warnings.append(f"OS가 본 SSD SMART 상태가 '{status}'예요. SSD 점검이 필요해요")
     return warnings
+
+
+def _smart_statuses(nvme: str) -> list[str]:
+    """내장 NVMe마다 OS가 본 SMART 상태(빈 값 제외). 요약 경고와 osDiskHealth가 같은 판정을 쓰게 한 곳에 둔다."""
+    statuses = [str(d.get("smart_status") or "") for ctrl in _sp_items(nvme, "SPNVMeDataType")
+                for d in ctrl.get("_items", [])]
+    return [s for s in statuses if s]
+
+
+def disk_health(nvme: str) -> str | None:
+    """계약 checks.osDiskHealth: 내장 NVMe의 OS SMART 상태가 모두 Verified면 OK, 하나라도 다르면 WARNING, 못 읽으면 None."""
+    statuses = _smart_statuses(nvme)
+    if not statuses:
+        return None
+    return "OK" if all(s.lower() == "verified" for s in statuses) else "WARNING"
 
 
 def lock_status(hardware: str) -> str | None:
@@ -236,10 +249,11 @@ def collect(run: Runner, now: float | None = None) -> dict[str, Any]:
         "battery": battery,
         "storage": parse_smartctl(outs[SMARTCTL]),
         "sources": [o.source for o in outs.values()],
-        # 아래는 요약에만 쓰고 올리지 않는다(report.assemble이 넣지 않음)
+        # 요약에 보이는 잠금 상태·경고. report.assemble이 계약 checks(ON·OFF 코드)로 바꿔 함께 올린다
         "checks": {"activationLock": lock_status(text(HARDWARE)),
                    "fileVault": ("켜짐" if "FileVault is On" in text(FILEVAULT)
                                  else "꺼짐" if "FileVault is Off" in text(FILEVAULT) else None),
+                   "osDiskHealth": disk_health(text(NVME)),
                    "warnings": parse_checks(text(HARDWARE), text(FILEVAULT), text(NVME))},
     }
 

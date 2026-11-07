@@ -20,7 +20,7 @@ MACOS: tuple[tuple[str, ...], ...] = (
     ("smartctl", "-j", "-a", "disk0"),
     ("ps", "-A", "-o", "pid="),
     ("sysctl", "-n", "kern.boottime"),
-    # 반납 점검 경고용(올리지 않음): FileVault 켜짐 여부만 한 줄로 준다
+    # 반납 점검(계약 checks.diskEncryption): FileVault 켜짐 여부만 한 줄로 준다
     ("fdesetup", "status"),
 )
 
@@ -56,7 +56,7 @@ WINDOWS: dict[str, tuple[str, ...]] = {
     # smartctl이 없으면 Windows 기본 기능으로 내장 디스크(첫 번째 USB 아닌 디스크)의 마모도·가동 시간(관리자 권한 필요)
     "RELIABILITY": _ps("Get-PhysicalDisk | ? BusType -ne USB | select -First 1 | "
                        "Get-StorageReliabilityCounter | select Wear,PowerOnHours" + _JSON),
-    # 반납 점검 경고용(올리지 않음): BitLocker 보호 상태(관리자 권한 필요, 없으면 '모름')
+    # 반납 점검(계약 checks.diskEncryption): BitLocker 보호 상태(관리자 권한 필요, 없으면 '모름')
     # sources 한 줄 200자 제한(diag.v1) 때문에 줄인 별칭(gcim·select)을 쓴다
     "BITLOCKER": _ps("gcim -N root/cimv2/Security/MicrosoftVolumeEncryption Win32_EncryptableVolume | "
                      "select DriveLetter,ProtectionStatus" + _JSON),
