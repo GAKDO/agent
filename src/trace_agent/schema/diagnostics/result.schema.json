@@ -107,6 +107,35 @@
       "maxItems": 32,
       "description": "실행한 명령 목록(NFR-02 고정 목록에서). 원본 JSON에만 남는다.",
       "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["activationLock", "diskEncryption", "osDiskHealth"],
+      "description": "선택(11/7 추가, schemaVersion은 diag.v1 그대로). 출고·반납 때 직원이 봐야 할 잠금·디스크 상태. 못 읽은 값은 null. 이 칸이 없는 옛 에이전트 진단은 서버가 모두 null로 본다. diagnostics-server는 ON·WARNING이면 점검 플래그(ACTIVATION_LOCK_ON·DISK_ENCRYPTION_ON·DISK_HEALTH_WARNING)를 붙인다.",
+      "properties": {
+        "activationLock": {
+          "oneOf": [
+            { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsLockState" },
+            { "type": "null" }
+          ],
+          "description": "macOS 활성화 잠금(나의 Mac 찾기). 켜져 있으면 초기화 뒤 고객 Apple ID 없이 다시 못 쓴다. Windows는 null"
+        },
+        "diskEncryption": {
+          "oneOf": [
+            { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsLockState" },
+            { "type": "null" }
+          ],
+          "description": "시스템 디스크 암호화. macOS는 FileVault, Windows는 C: 드라이브 BitLocker 보호 상태. 관리자 권한이 없어 못 읽으면 null"
+        },
+        "osDiskHealth": {
+          "oneOf": [
+            { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsDiskHealth" },
+            { "type": "null" }
+          ],
+          "description": "OS가 본 내장 SSD SMART 상태. macOS system_profiler smart_status가 Verified면 OK, 다른 값이면 WARNING. 읽지 못했거나 Windows면 null"
+        }
+      }
     }
   },
   "allOf": [

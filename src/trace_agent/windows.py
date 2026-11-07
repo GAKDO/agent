@@ -237,7 +237,7 @@ def parse_reliability(out: Output, disks: str) -> dict[str, Any]:
 
 
 def parse_checks(bitlocker: Output) -> dict[str, Any]:
-    """반납·출고 전 경고(올리지 않고 요약에만). BitLocker가 켜져 있으면 복구 키 없이 디스크를 못 연다.
+    """반납·출고 전 경고(요약에 보이고 계약 checks.diskEncryption으로도 올림). BitLocker가 켜져 있으면 복구 키 없이 디스크를 못 연다.
     관리자 권한이 없으면 읽지 못해 '모름'."""
     volumes = rows(bitlocker.stdout) if bitlocker.ok else []
     system = next((v for v in volumes if str(v.get("DriveLetter") or "").upper().startswith("C")), None)
@@ -293,5 +293,5 @@ def collect(run: Runner) -> dict[str, Any]:
         "battery": battery,
         "storage": storage,
         "sources": [o.source for o in outs.values()],
-        "checks": parse_checks(outs[BITLOCKER]),  # 요약에만 쓰고 올리지 않는다
+        "checks": parse_checks(outs[BITLOCKER]),  # 요약에 쓰고, report.assemble이 계약 checks로 바꿔 올린다
     }

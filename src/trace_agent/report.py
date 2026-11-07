@@ -43,7 +43,19 @@ def assemble(collected: dict[str, Any], *, agent_version: str, collected_at: str
         "benchmarks": benchmarks,
         "benchmarkSkippedReason": benchmark_skipped_reason,
         "sources": collected["sources"],
+        **({"checks": upload_checks(collected["checks"])} if "checks" in collected else {}),
     }
+
+
+_LOCK_CODE = {"켜짐": "ON", "꺼짐": "OFF"}
+
+
+def upload_checks(checks: dict[str, Any]) -> dict[str, str | None]:
+    """요약용 잠금 상태(켜짐·꺼짐·None) → 계약 checks 코드 값. 디스크 암호화는 macOS FileVault, Windows BitLocker."""
+    encryption = checks.get("fileVault") if "fileVault" in checks else checks.get("bitLocker")
+    return {"activationLock": _LOCK_CODE.get(checks.get("activationLock") or ""),
+            "diskEncryption": _LOCK_CODE.get(encryption or ""),
+            "osDiskHealth": checks.get("osDiskHealth")}
 
 
 def errors(doc: dict[str, Any]) -> list[str]:
@@ -67,7 +79,7 @@ def spread_percent(trials: list[float], median: float) -> float:
 
 def summary(doc: dict[str, Any], checks: dict[str, Any] | None = None) -> str:
     """동의 전에 보여 줄 요약. 올라갈 값과 실행한 명령을 그대로 보인다.
-    checks(잠금 상태·경고)는 계약에 칸이 없어 올리지 않고 여기서만 보인다."""
+    checks(잠금 상태·경고)는 여기서 사람이 읽는 말로 보이고, 같은 상태가 계약 checks(ON·OFF 코드)로도 올라간다."""
     d, c, b, s = doc["device"], doc["conditions"], doc["battery"], doc["storage"]
     lines = [
         f"기기: {d['manufacturer']} {d.get('modelName') or d['model']} ({d['model']}), 시리얼 {d['serial']}",
@@ -110,7 +122,7 @@ def summary(doc: dict[str, Any], checks: dict[str, Any] | None = None) -> str:
         locks = [f"{name} {checks[key] or '모름'}" for key, name in
                  (("activationLock", "활성화 잠금"), ("fileVault", "FileVault"), ("bitLocker", "BitLocker")) if key in checks]
         if locks:
-            lines.append("잠금(올리지 않음): " + ", ".join(locks))
+            lines.append("잠금: " + ", ".join(locks))
         lines += [f"[주의] {w}" for w in checks.get("warnings", [])]
     lines.append("실행한 명령: " + "; ".join(doc["sources"]))
     return "\n".join(lines)

@@ -20,18 +20,21 @@ def _doc(collected: dict) -> dict:
                            benchmark_skipped_reason="NO_AC_POWER")
 
 
-def test_활성화_잠금이_켜져_있으면_요약에_경고가_보이고_올리는_JSON에는_들어가지_않는다():
+def test_활성화_잠금이_켜져_있으면_요약에_경고가_보이고_올리는_JSON에는_코드_값으로_들어간다():
     collected = macos.collect(FixtureRunner({macos.HARDWARE: Output(macos.HARDWARE, 0, LOCKED)}))
     doc = _doc(collected)
     text = report.summary(doc, collected["checks"])
     assert "활성화 잠금 켜짐" in text and "[주의] 활성화 잠금" in text
-    assert report.errors(doc) == [] and "checks" not in doc and "활성화" not in json.dumps(doc, ensure_ascii=False)
+    assert report.errors(doc) == [] and doc["checks"]["activationLock"] == "ON"
+    assert "활성화" not in json.dumps(doc, ensure_ascii=False)  # 경고 문장은 올리지 않는다
 
 
 def test_잠금이_모두_꺼져_있으면_경고_없이_꺼짐만_보인다(runner):
     collected = macos.collect(runner)
-    assert collected["checks"] == {"activationLock": "꺼짐", "fileVault": "꺼짐", "warnings": []}
-    assert "잠금(올리지 않음): 활성화 잠금 꺼짐, FileVault 꺼짐" in report.summary(_doc(collected), collected["checks"])
+    assert collected["checks"] == {"activationLock": "꺼짐", "fileVault": "꺼짐", "osDiskHealth": "OK", "warnings": []}
+    doc = _doc(collected)
+    assert "잠금: 활성화 잠금 꺼짐, FileVault 꺼짐" in report.summary(doc, collected["checks"])
+    assert doc["checks"] == {"activationLock": "OFF", "diskEncryption": "OFF", "osDiskHealth": "OK"}
 
 
 def test_FileVault가_켜져_있으면_경고하고_못_읽으면_모름이다():
@@ -43,8 +46,24 @@ def test_FileVault가_켜져_있으면_경고하고_못_읽으면_모름이다()
 
 def test_OS가_본_SSD_SMART가_Verified가_아니면_경고한다():
     nvme = (FIXTURES / "nvme.json").read_text(encoding="utf-8").replace('"Verified"', '"Failing"')
-    checks = macos.collect(FixtureRunner({macos.NVME: Output(macos.NVME, 0, nvme)}))["checks"]
-    assert any("Failing" in w for w in checks["warnings"])
+    collected = macos.collect(FixtureRunner({macos.NVME: Output(macos.NVME, 0, nvme)}))
+    assert any("Failing" in w for w in collected["checks"]["warnings"])
+    doc = _doc(collected)
+    assert doc["checks"]["osDiskHealth"] == "WARNING" and report.errors(doc) == []
+
+
+def test_잠금_상태를_못_읽으면_올리는_checks는_모두_null이다():
+    failed = {cmd: Output(cmd, None, "", "명령 없음") for cmd in (macos.HARDWARE, macos.FILEVAULT, macos.NVME)}
+    collected = macos.collect(FixtureRunner(failed))
+    doc = _doc(collected)
+    assert doc["checks"] == {"activationLock": None, "diskEncryption": None, "osDiskHealth": None}
+    # 하드웨어 정보도 못 읽어 device가 비므로 checks 칸만 따로 확인한다
+    assert not [e for e in report.errors(doc) if e.startswith("checks")]
+
+
+def test_윈도우는_BitLocker를_디스크_암호화로_올리고_활성화_잠금은_null이다():
+    assert report.upload_checks({"bitLocker": "켜짐", "warnings": []}) == {
+        "activationLock": None, "diskEncryption": "ON", "osDiskHealth": None}
 
 
 def test_smartctl이_없어도_요약에_OS_SMART_상태를_보인다(runner):
