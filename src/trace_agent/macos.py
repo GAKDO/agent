@@ -112,19 +112,22 @@ def parse_checks(hardware: str, filevault: str, nvme: str) -> list[str]:
         warnings.append("활성화 잠금(나의 Mac 찾기)이 켜져 있어요. 고객이 iCloud에서 기기를 지워야 다시 대여할 수 있어요")
     if "FileVault is On" in filevault:
         warnings.append("FileVault가 켜져 있어요. 초기화 전에 고객이 끄거나 관리자 암호를 알려 줘야 해요")
-    disks = [d for ctrl in _sp_items(nvme, "SPNVMeDataType") for d in ctrl.get("_items", [])]
-    for d in disks:
-        status = str(d.get("smart_status") or "")
-        if status and status.lower() != "verified":
+    for status in _smart_statuses(nvme):
+        if status.lower() != "verified":
             warnings.append(f"OS가 본 SSD SMART 상태가 '{status}'예요. SSD 점검이 필요해요")
     return warnings
 
 
-def disk_health(nvme: str) -> str | None:
-    """계약 checks.osDiskHealth: 내장 NVMe의 OS SMART 상태가 모두 Verified면 OK, 하나라도 다르면 WARNING, 못 읽으면 None."""
+def _smart_statuses(nvme: str) -> list[str]:
+    """내장 NVMe마다 OS가 본 SMART 상태(빈 값 제외). 요약 경고와 osDiskHealth가 같은 판정을 쓰게 한 곳에 둔다."""
     statuses = [str(d.get("smart_status") or "") for ctrl in _sp_items(nvme, "SPNVMeDataType")
                 for d in ctrl.get("_items", [])]
-    statuses = [s for s in statuses if s]
+    return [s for s in statuses if s]
+
+
+def disk_health(nvme: str) -> str | None:
+    """계약 checks.osDiskHealth: 내장 NVMe의 OS SMART 상태가 모두 Verified면 OK, 하나라도 다르면 WARNING, 못 읽으면 None."""
+    statuses = _smart_statuses(nvme)
     if not statuses:
         return None
     return "OK" if all(s.lower() == "verified" for s in statuses) else "WARNING"
