@@ -11,9 +11,11 @@ TRACE(노트북 렌탈 상태 기록 서비스)의 **agent**: 진단 에이전�
 관리자 화면 렌탈 상세의 "명령 복사"(web #100)로 받은 명령을 붙여 넣으면, 에이전트 소스를 받아 풀고 `TRACE_API_URL=https://gakdo.site`로 바로 실행한다. 실행 의존성(jsonschema)은 `pip --target`으로 같은 폴더의 `lib`에 받고, pypi.org가 막힌 학교 망에서는 카카오 미러로 다시 받는다. 결과를 보여 준 뒤 `y`를 넣어야 올린다.
 
 ```bash
-# macOS (파이썬 3.11 이상이 없으면 독립 실행형 파이썬 3.12를 ~/.trace-agent/python에 받아 쓴다. 관리자 권한 필요 없음)
+# macOS (파이썬 3.11 이상이 없으면 독립 실행형 파이썬 3.12를 ~/.trace-agent/python에, smartctl이 없으면 smartmontools 7.4 dmg에서 꺼낸 smartctl을 ~/.trace-agent/bin에 받아 쓴다. 관리자 권한 필요 없음)
 curl -fsSL https://gakdo.site/agent.sh | sh -s 123456
 ```
+
+smartctl을 받지 않으려면 `curl -fsSL https://gakdo.site/agent.sh | TRACE_AGENT_NO_SMARTCTL=1 sh -s 123456`처럼 `sh` 앞에 붙인다(SSD만 "읽지 못함"으로 남는다).
 
 ```powershell
 # Windows PowerShell (관리자 권한이면 SSD 수명까지 읽는다. 파이썬이 없으면 nuget.org zip을 받아 쓴다)
