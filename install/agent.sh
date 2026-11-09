@@ -9,7 +9,8 @@
 # 결과를 화면에 보여 주고 y를 넣어야 올린다. 비밀값은 이 파일에 없다(페어링 코드는 5분짜리 일회용).
 #
 # 바꿀 수 있는 값(환경 변수): TRACE_API_URL(기본 https://gakdo.site), TRACE_AGENT_REF(브랜치나 태그, 기본 develop),
-# TRACE_AGENT_HOME(기본 ~/.trace-agent), TRACE_AGENT_SRC(소스 tar.gz 주소), TRACE_AGENT_PYTHON_URL(받을 파이썬 tar.gz)
+# TRACE_AGENT_HOME(기본 ~/.trace-agent), TRACE_AGENT_SRC(소스 tar.gz 주소), TRACE_AGENT_PYTHON_URL(받을 파이썬 tar.gz),
+# TRACE_AGENT_NO_SMARTCTL=1(macOS에서 smartctl을 받지 않음)
 set -eu
 
 CODE="${1:-}"
@@ -92,6 +93,34 @@ if [ -n "$DEPS" ] && ! PYTHONPATH="$LIB" "$PY" -c 'import jsonschema, referencin
     "$PY" -m pip install -q --disable-pip-version-check --target "$LIB" -i https://mirror.kakao.com/pypi/simple $DEPS \
       || die "패키지를 받지 못했어요: $DEPS"
   fi
+fi
+
+# SSD 수명은 smartctl로 읽는다. macOS에 없으면 smartmontools 공식 dmg(7.4, SHA-256 고정)에서 smartctl 하나만 꺼내
+# ~/.trace-agent/bin에 둔다. 설치 프로그램은 돌리지 않으므로 관리자 권한이 필요 없다. 실패해도 SSD만 "읽지 못함"으로 남고 계속한다
+SMART_URL="https://github.com/smartmontools/smartmontools/releases/download/RELEASE_7_4/smartmontools-7.4-1.dmg"
+SMART_SHA=3576000d82b4a9ef956c954d86de1eaf2937ca6a604cd2cd75db3901005107f4
+export PATH="$HOME_DIR/bin:$PATH:/usr/local/sbin:/opt/homebrew/bin:/opt/homebrew/sbin"
+get_smartctl() {
+  STMP="$(mktemp -d)"
+  if curl -fsSL "$SMART_URL" -o "$STMP/s.dmg" && [ "$(sha256 "$STMP/s.dmg")" = "$SMART_SHA" ] \
+    && hdiutil attach -quiet -nobrowse -readonly -noautoopen -mountpoint "$STMP/mnt" "$STMP/s.dmg" </dev/null; then
+    PKG="$(find "$STMP/mnt" -maxdepth 1 -name '*.pkg' | head -n 1)"
+    if [ -n "$PKG" ] && pkgutil --expand-full "$PKG" "$STMP/pkg" </dev/null >/dev/null 2>&1; then
+      BIN="$(find "$STMP/pkg" -type f -name smartctl -path '*sbin*' | head -n 1)"
+      if [ -n "$BIN" ]; then
+        mkdir -p "$HOME_DIR/bin"
+        cp "$BIN" "$HOME_DIR/bin/smartctl"
+        chmod 755 "$HOME_DIR/bin/smartctl"
+      fi
+    fi
+    hdiutil detach -quiet "$STMP/mnt" </dev/null || true
+  fi
+  rm -rf "$STMP"
+  command -v smartctl >/dev/null 2>&1
+}
+if [ "$(uname -s)" = Darwin ] && [ -z "${TRACE_AGENT_NO_SMARTCTL:-}" ] && ! command -v smartctl >/dev/null 2>&1; then
+  say "SSD를 읽는 도구(smartctl)가 없어 받아요(설치 없이 $HOME_DIR/bin 에만 둬요)..."
+  get_smartctl || say "smartctl을 받지 못했어요. SSD 값만 '읽지 못함'으로 나오고 나머지는 그대로 진행해요."
 fi
 
 # 진단 JSON은 ~/.trace-agent에 남긴다(올리지 못했을 때 `trace-agent upload`로 다시 올릴 수 있게)
