@@ -77,6 +77,8 @@ function Invoke-TraceAgent([string]$Code) {
   # 실행 의존성(pyproject.toml의 dependencies, 지금은 jsonschema)을 lib에 받는다. 이미 있으면 건너뛴다.
   # pip.exe 대신 python -m pip(스마트 앱 컨트롤). 학교 망은 pypi.org를 막으므로 안 되면 카카오 미러로 다시 받는다
   $lib = Join-Path $home_ 'lib'
+  # PS 5.1은 Stop일 때 외부 명령의 stderr를 2>$null로 돌려도 종료 오류로 바꾼다. 이 구간은 종료 코드로만 판단한다
+  $ErrorActionPreference = 'Continue'
   $oldPath = $env:PYTHONPATH
   $env:PYTHONPATH = $lib
   & $py.exe @($py.args + @('-c', 'import jsonschema, referencing')) 2>$null | Out-Null
@@ -97,6 +99,7 @@ function Invoke-TraceAgent([string]$Code) {
       }
     }
   }
+  $ErrorActionPreference = 'Stop'
 
   $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)

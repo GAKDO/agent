@@ -65,3 +65,4 @@ def test_jsonschema가_없는_새_파이썬이면_lib에_받아_쓴다(tmp_path:
     assert (home / "lib" / "jsonschema").is_dir(), result.stdout + result.stderr
     assert "기기 정보를 읽는 중" in result.stdout
     assert "ModuleNotFoundError" not in result.stderr
+    assert (home / "trace-diagnostics.json").exists()
