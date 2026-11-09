@@ -2,7 +2,7 @@
 #
 #   & ([scriptblock]::Create((irm https://gakdo.site/agent.ps1))) 123456
 #
-# 하는 일: 에이전트 소스를 GitHub에서 받아 %LOCALAPPDATA%\trace-agent에 풀고(외부 패키지가 없어 pip가 필요 없다),
+# 하는 일: 에이전트 소스를 GitHub에서 받아 %LOCALAPPDATA%\trace-agent에 풀고(실행 의존성 jsonschema는 python -m pip --target으로 lib에, pypi.org가 막히면 카카오 미러),
 # TRACE_API_URL을 채워 `python -m trace_agent run --code <코드>`를 실행한다. python.exe로 모듈을 부르므로
 # 스마트 앱 컨트롤이 서명 없는 trace-agent.exe를 막아도 돈다. 파이썬이 없으면 nuget.org의 공식 zip을 받아 쓴다
 # (학교 망은 python.org·pypi.org를 막는다). 결과를 보여 주고 y를 넣어야 올린다. 비밀값은 이 파일에 없다.
@@ -66,8 +66,36 @@ function Invoke-TraceAgent([string]$Code) {
     $dstSrc = Join-Path $home_ 'src'
     if (Test-Path $dstSrc) { Remove-Item -Recurse -Force $dstSrc }
     Move-Item (Join-Path $new.FullName 'src') $dstSrc
+    # PS 5.1은 외부 명령 인자 속 큰따옴표를 망가뜨리므로 파이썬 코드에 작은따옴표만 쓴다
+    $pyproject = Join-Path $new.FullName 'pyproject.toml'
+    $deps = @(& $py.exe @($py.args + @('-c', 'import sys, tomllib; print(chr(10).join(tomllib.load(open(sys.argv[1], ''rb''))[''project''][''dependencies'']))', $pyproject)) |
+      Where-Object { $_ })
   } finally {
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+  }
+
+  # 실행 의존성(pyproject.toml의 dependencies, 지금은 jsonschema)을 lib에 받는다. 이미 있으면 건너뛴다.
+  # pip.exe 대신 python -m pip(스마트 앱 컨트롤). 학교 망은 pypi.org를 막으므로 안 되면 카카오 미러로 다시 받는다
+  $lib = Join-Path $home_ 'lib'
+  $oldPath = $env:PYTHONPATH
+  $env:PYTHONPATH = $lib
+  & $py.exe @($py.args + @('-c', 'import jsonschema, referencing')) 2>$null | Out-Null
+  $haveDeps = ($LASTEXITCODE -eq 0)
+  $env:PYTHONPATH = $oldPath
+  if ($deps.Count -gt 0 -and -not $haveDeps) {
+    Write-Host "필요한 패키지를 받는 중이에요: $($deps -join ' ')"
+    if (Test-Path $lib) { Remove-Item -Recurse -Force $lib }
+    $pipArgs = @('-m', 'pip', 'install', '-q', '--disable-pip-version-check', '--target', $lib)
+    & $py.exe @($py.args + $pipArgs + @('--timeout', '10', '--retries', '1') + $deps) 2>$null
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host 'pypi.org에 닿지 않아 카카오 미러로 다시 받아요...'
+      if (Test-Path $lib) { Remove-Item -Recurse -Force $lib }
+      & $py.exe @($py.args + $pipArgs + @('-i', 'https://mirror.kakao.com/pypi/simple') + $deps)
+      if ($LASTEXITCODE -ne 0) {
+        Write-Host "패키지를 받지 못했어요: $($deps -join ' ')" -ForegroundColor Red
+        return
+      }
+    }
   }
 
   $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
@@ -78,7 +106,7 @@ function Invoke-TraceAgent([string]$Code) {
 
   $oldApi = $env:TRACE_API_URL; $oldPath = $env:PYTHONPATH
   $env:TRACE_API_URL = $api
-  $env:PYTHONPATH = Join-Path $home_ 'src'
+  $env:PYTHONPATH = (Join-Path $home_ 'src') + ';' + $lib
   Push-Location $home_  # 진단 JSON은 이 폴더에 남는다(못 올렸을 때 다시 올리기용)
   try {
     $agentArgs = @('-m', 'trace_agent', 'run')
