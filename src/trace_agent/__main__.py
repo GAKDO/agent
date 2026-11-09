@@ -97,13 +97,39 @@ def _upload(api: str, code: str, doc: dict[str, Any], out: Path, post: upload.Po
     return 0
 
 
+def _wait_for_power(collected: dict[str, Any], power: Callable[[], dict[str, Any]],
+                    ask: Callable[[str], str]) -> None:
+    """충전기가 없으면 벤치마크 전에 묻는다(11/9: 충전기를 깜박하고 돌려 벤치마크가 빠짐).
+
+    Enter면 전원을 다시 읽고, n이면 충전기 없이 진행한다(벤치마크는 NO_AC_POWER로 건너뜀)."""
+    print("\n충전기가 연결되어 있지 않아요. 배터리로는 성능 측정(벤치마크)을 하지 않아요.")
+    for _ in range(3):  # 세 번 확인해도 안 되면 충전기 없이 진행
+        try:
+            answer = ask("충전기를 꽂고 Enter를 누르면 다시 확인해요. 충전기 없이 진행하려면 n: ").strip().lower()
+        except EOFError:  # 터미널이 없으면 묻지 않고 전처럼 진행
+            return
+        if answer == "n":
+            print("충전기 없이 진행해요. 벤치마크는 건너뛰어요.")
+            return
+        now = power()
+        if now["acPower"]:
+            collected["conditions"].update(now)
+            print("충전기가 연결됐어요.")
+            return
+        print("아직 충전기가 확인되지 않아요.")
+    print("충전기를 확인하지 못해 충전기 없이 진행해요. 벤치마크는 건너뛰어요.")
+
+
 def _run(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str], str], run: commands.Runner,
          post: upload.Post, workloads: Any, clock: Callable[[], str], sleep: upload.Sleep) -> int:
     api = env.get("TRACE_API_URL", "").rstrip("/")
     if (code := _check_api(api, args.code)) is not None:
         return code
     print("기기 정보를 읽는 중이에요...", flush=True)
-    collected = (windows if args.system == "win32" else macos).collect(run)
+    system = windows if args.system == "win32" else macos
+    collected = system.collect(run)
+    if not collected["conditions"]["acPower"]:
+        _wait_for_power(collected, lambda: system.power(run), ask)
     if collected["conditions"]["acPower"]:
         print("벤치마크를 돌려요. 1분쯤 걸리니 전원을 연결한 채로 기다려 주세요.", flush=True)
     benches, skipped = benchmark.run(collected["conditions"]["acPower"], workloads,
