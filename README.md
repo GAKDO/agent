@@ -15,6 +15,8 @@ TRACE(노트북 렌탈 상태 기록 서비스)의 **agent**: 진단 에이전�
 curl -fsSL https://gakdo.site/agent.sh | sh -s 123456
 ```
 
+smartctl을 받지 않으려면 `curl -fsSL https://gakdo.site/agent.sh | TRACE_AGENT_NO_SMARTCTL=1 sh -s 123456`처럼 `sh` 앞에 붙인다(SSD만 "읽지 못함"으로 남는다).
+
 ```powershell
 # Windows PowerShell (관리자 권한이면 SSD 수명까지 읽는다. 파이썬이 없으면 nuget.org zip을 받아 쓴다)
 & ([scriptblock]::Create((irm https://gakdo.site/agent.ps1))) 123456

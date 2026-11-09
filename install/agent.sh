@@ -102,7 +102,7 @@ SMART_SHA=3576000d82b4a9ef956c954d86de1eaf2937ca6a604cd2cd75db3901005107f4
 export PATH="$HOME_DIR/bin:$PATH:/usr/local/sbin:/opt/homebrew/bin:/opt/homebrew/sbin"
 get_smartctl() {
   STMP="$(mktemp -d)"
-  if curl -fsSL "$SMART_URL" -o "$STMP/s.dmg" && [ "$(sha256 "$STMP/s.dmg")" = "$SMART_SHA" ] \
+  if curl -fsSL --connect-timeout 10 --max-time 120 "$SMART_URL" -o "$STMP/s.dmg" && [ "$(sha256 "$STMP/s.dmg")" = "$SMART_SHA" ] \
     && hdiutil attach -quiet -nobrowse -readonly -noautoopen -mountpoint "$STMP/mnt" "$STMP/s.dmg" </dev/null; then
     PKG="$(find "$STMP/mnt" -maxdepth 1 -name '*.pkg' | head -n 1)"
     if [ -n "$PKG" ] && pkgutil --expand-full "$PKG" "$STMP/pkg" </dev/null >/dev/null 2>&1; then
