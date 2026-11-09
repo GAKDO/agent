@@ -3,11 +3,11 @@
 #
 #   curl -fsSL https://gakdo.site/agent.sh | sh -s 123456
 #
-# 하는 일: 에이전트 소스를 GitHub에서 받아 ~/.trace-agent에 풀고(외부 패키지가 없어 pip가 필요 없다),
+# 하는 일: 에이전트 소스를 GitHub에서 받아 ~/.trace-agent에 풀고(실행 의존성 jsonschema는 pip --target으로 ~/.trace-agent/lib에, pypi.org가 막히면 카카오 미러),
 # TRACE_API_URL을 채워 `python3 -m trace_agent run --code <코드>`를 실행한다.
 # 결과를 화면에 보여 주고 y를 넣어야 올린다. 비밀값은 이 파일에 없다(페어링 코드는 5분짜리 일회용).
 #
-# 바꿀 수 있는 값(환경 변수): TRACE_API_URL(기본 https://gakdo.site), TRACE_AGENT_REF(기본 develop),
+# 바꿀 수 있는 값(환경 변수): TRACE_API_URL(기본 https://gakdo.site), TRACE_AGENT_REF(브랜치나 태그, 기본 develop),
 # TRACE_AGENT_HOME(기본 ~/.trace-agent), TRACE_AGENT_SRC(소스 tar.gz 주소)
 set -eu
 
@@ -15,7 +15,7 @@ CODE="${1:-}"
 API="${TRACE_API_URL:-https://gakdo.site}"
 REF="${TRACE_AGENT_REF:-develop}"
 HOME_DIR="${TRACE_AGENT_HOME:-$HOME/.trace-agent}"
-SRC="${TRACE_AGENT_SRC:-https://codeload.github.com/GAKDO/agent/tar.gz/refs/heads/$REF}"
+SRC="${TRACE_AGENT_SRC:-https://codeload.github.com/GAKDO/agent/tar.gz/$REF}"
 
 say() { printf '%s\n' "$*"; }
 die() { printf '%s\n' "$*" >&2; exit 1; }
@@ -56,10 +56,28 @@ NEW="$(find "$TMP" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 rm -rf "$HOME_DIR/src"
 mv "$NEW/src" "$HOME_DIR/src"
 
+# 실행 의존성(pyproject.toml의 dependencies, 지금은 jsonschema)을 ~/.trace-agent/lib에 받는다. 이미 있으면 건너뛴다.
+# 학교 망은 pypi.org를 막으므로 안 되면 카카오 미러로 다시 받는다
+LIB="$HOME_DIR/lib"
+DEPS="$("$PY" -c 'import sys, tomllib; print(" ".join(tomllib.load(open(sys.argv[1], "rb"))["project"]["dependencies"]))' "$NEW/pyproject.toml")"
+if [ -n "$DEPS" ] && ! PYTHONPATH="$LIB" "$PY" -c 'import jsonschema, referencing' 2>/dev/null; then
+  "$PY" -m pip --version >/dev/null 2>&1 || die "이 파이썬($PY)에 pip가 없어요. python.org 설치 파일이나 brew install python@3.12로 설치한 파이썬을 써 주세요."
+  say "필요한 패키지를 받는 중이에요: $DEPS"
+  rm -rf "$LIB"
+  # shellcheck disable=SC2086 # DEPS는 공백으로 나눈 패키지 목록
+  if ! "$PY" -m pip install -q --disable-pip-version-check --timeout 10 --retries 1 --target "$LIB" $DEPS 2>/dev/null; then
+    say "pypi.org에 닿지 않아 카카오 미러로 다시 받아요..."
+    rm -rf "$LIB"
+    # shellcheck disable=SC2086
+    "$PY" -m pip install -q --disable-pip-version-check --target "$LIB" -i https://mirror.kakao.com/pypi/simple $DEPS \
+      || die "패키지를 받지 못했어요: $DEPS"
+  fi
+fi
+
 # 진단 JSON은 ~/.trace-agent에 남긴다(올리지 못했을 때 `trace-agent upload`로 다시 올릴 수 있게)
 cd "$HOME_DIR"
 export TRACE_API_URL="$API"
-export PYTHONPATH="$HOME_DIR/src"
+export PYTHONPATH="$HOME_DIR/src:$LIB"
 if [ -z "$CODE" ]; then
   set -- run
 else

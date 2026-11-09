@@ -6,6 +6,25 @@ TRACE(노트북 렌탈 상태 기록 서비스)의 **agent**: 진단 에이전�
 - 설계: [GAKDO/docs](https://github.com/GAKDO/docs) — 진단 JSON v0(design/diagnostics-json-v0.md)
 - 기술: Python 3.12
 
+## 한 줄로 설치·실행 (관리자 화면의 페어링 코드)
+
+관리자 화면 렌탈 상세의 "명령 복사"(web #100)로 받은 명령을 붙여 넣으면, 에이전트 소스를 받아 풀고 `TRACE_API_URL=https://gakdo.site`로 바로 실행한다. 실행 의존성(jsonschema)은 `pip --target`으로 같은 폴더의 `lib`에 받고, pypi.org가 막힌 학교 망에서는 카카오 미러로 다시 받는다. 결과를 보여 준 뒤 `y`를 넣어야 올린다.
+
+```bash
+# macOS (파이썬 3.11 이상 필요. 기본 /usr/bin/python3는 3.9라 안 됨. 없으면 설치 방법을 알려 주고 멈춘다)
+curl -fsSL https://gakdo.site/agent.sh | sh -s 123456
+```
+
+```powershell
+# Windows PowerShell (관리자 권한이면 SSD 수명까지 읽는다. 파이썬이 없으면 nuget.org zip을 받아 쓴다)
+& ([scriptblock]::Create((irm https://gakdo.site/agent.ps1))) 123456
+```
+
+- 스크립트: `install/agent.sh`, `install/agent.ps1`. 소스는 `~/.trace-agent`(Windows는 `%LOCALAPPDATA%\trace-agent`)에 풀리고 진단 JSON도 거기 남는다
+- `/agent.sh`·`/agent.ps1`은 web nginx가 `raw.githubusercontent.com/GAKDO/agent/develop/install/...`로 302 넘긴다
+- 다른 서버로 올릴 때: `curl -fsSL <화면>/agent.sh | TRACE_API_URL=<API 주소> sh -s 123456`(변수는 `sh` 쪽에 붙인다)
+- 환경 변수: `TRACE_API_URL`, `TRACE_AGENT_REF`(받을 브랜치나 태그, 기본 develop. 프리즈 때 태그로 고정 예정), `TRACE_AGENT_HOME`, `TRACE_AGENT_SRC`
+
 ## 실행 (macOS)
 
 ```bash
