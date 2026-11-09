@@ -257,6 +257,13 @@ def _os_version() -> str:
     return (version or "unknown")[:32]
 
 
+def power(run: Runner) -> dict[str, Any]:
+    """전원 연결·잔량만 다시 읽는다(충전기를 꽂았는지 확인할 때)."""
+    battery, status = run(BATTERY), run(BATTERY_STATUS)
+    cond = parse_conditions(battery.stdout if battery.ok else "", status.stdout if status.ok else "", "", "")
+    return {"acPower": cond["acPower"], "batteryPercent": cond["batteryPercent"]}
+
+
 def collect(run: Runner) -> dict[str, Any]:
     """고정 목록 명령을 돌려 진단 JSON 조각(벤치마크·시각 제외)을 만든다."""
     outs = {argv: run(argv) for argv in (SYSTEM, BIOS, CPU, MEMORY, DISKS, VIDEO, BATTERY, BATTERY_STATIC,
