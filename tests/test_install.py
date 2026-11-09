@@ -17,9 +17,10 @@ SCRIPT = ROOT / "install" / "agent.sh"
 pytestmark = pytest.mark.skipif(sys.platform == "win32" or shutil.which("sh") is None, reason="POSIX sh 필요")
 
 
-def _sh(args: list[str], env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def _sh(args: list[str], env: dict[str, str], script: str | None = None) -> subprocess.CompletedProcess[str]:
     # curl | sh -s 처럼 스크립트를 표준 입력으로 준다
-    return subprocess.run(["sh", "-s", *args], check=False, input=SCRIPT.read_text(encoding="utf-8"),
+    text = SCRIPT.read_text(encoding="utf-8") if script is None else script
+    return subprocess.run(["sh", "-s", *args], check=False, input=text,
                           capture_output=True,
                           text=True, env=env, timeout=300)
 
@@ -66,3 +67,25 @@ def test_jsonschema가_없는_새_파이썬이면_lib에_받아_쓴다(tmp_path:
     assert "기기 정보를 읽는 중" in result.stdout
     assert "ModuleNotFoundError" not in result.stderr
     assert (home / "trace-diagnostics.json").exists()
+
+
+def _net_env(env: dict[str, str]) -> dict[str, str]:
+    for key in ("HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy", "NO_PROXY", "no_proxy", "PIP_CERT",
+                "SSL_CERT_FILE", "CURL_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "PIP_INDEX_URL"):
+        if key in os.environ:
+            env[key] = os.environ[key]
+    return env
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="macOS CI에서는 실제 수집·벤치마크가 돌아 오래 걸린다")
+def test_파이썬이_없으면_독립_실행형_파이썬을_받아_쓴다(tmp_path: Path) -> None:
+    script = SCRIPT.read_text(encoding="utf-8")
+    line = next(x for x in script.splitlines() if x.startswith("for c in "))
+    # 이 컴퓨터의 파이썬을 못 찾은 것처럼 후보를 받아 둔 파이썬 하나로 줄인다(친구 맥처럼 3.11 이상이 없는 경우)
+    script = script.replace(line, 'for c in "$HOME_DIR/python/bin/python3"; do')
+    home = tmp_path / "home"
+    env = _net_env({"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "TRACE_AGENT_HOME": str(home),
+                    "TRACE_AGENT_SRC": _archive(tmp_path).as_uri()})
+    result = _sh([], env, script)
+    assert (home / "python" / "bin" / "python3").exists(), result.stdout + result.stderr
+    assert "기기 정보를 읽는 중" in result.stdout, result.stdout + result.stderr
