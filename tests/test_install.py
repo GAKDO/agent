@@ -89,3 +89,20 @@ def test_파이썬이_없으면_독립_실행형_파이썬을_받아_쓴다(tmp_
     result = _sh([], env, script)
     assert (home / "python" / "bin" / "python3").exists(), result.stdout + result.stderr
     assert "기기 정보를 읽는 중" in result.stdout, result.stdout + result.stderr
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="hdiutil·pkgutil은 macOS에만 있다")
+def test_맥에_smartctl이_없으면_dmg에서_꺼내_bin에_둔다(tmp_path: Path) -> None:
+    if any(Path(d, "smartctl").exists() for d in ("/usr/local/sbin", "/usr/local/bin", "/opt/homebrew/bin",
+                                                  "/opt/homebrew/sbin")):
+        pytest.skip("이 맥에는 이미 smartctl이 있다")
+    # 에이전트 실행(수집·벤치마크) 직전에서 끊는다
+    script = SCRIPT.read_text(encoding="utf-8").split("# 진단 JSON은")[0] + "exit 0\n"
+    home = tmp_path / "home"
+    env = _net_env({"PATH": f"{Path(sys.executable).parent}:/usr/bin:/bin:/usr/sbin:/sbin", "HOME": str(tmp_path),
+                    "TRACE_AGENT_HOME": str(home), "TRACE_AGENT_SRC": _archive(tmp_path).as_uri()})
+    result = _sh([], env, script)
+    smartctl = home / "bin" / "smartctl"
+    assert smartctl.exists(), result.stdout + result.stderr
+    version = subprocess.run([str(smartctl), "--version"], check=False, capture_output=True, text=True)
+    assert "smartctl 7.4" in version.stdout
