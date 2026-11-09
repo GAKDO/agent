@@ -7,7 +7,7 @@
 # 스마트 앱 컨트롤이 서명 없는 trace-agent.exe를 막아도 돈다. 파이썬이 없으면 nuget.org의 공식 zip을 받아 쓴다
 # (학교 망은 python.org·pypi.org를 막는다). 결과를 보여 주고 y를 넣어야 올린다. 비밀값은 이 파일에 없다.
 #
-# 바꿀 수 있는 값(환경 변수): TRACE_API_URL(기본 https://gakdo.site), TRACE_AGENT_REF(기본 develop),
+# 바꿀 수 있는 값(환경 변수): TRACE_API_URL(기본 https://gakdo.site), TRACE_AGENT_REF(브랜치나 태그, 기본 develop),
 # TRACE_AGENT_HOME(기본 %LOCALAPPDATA%\trace-agent), TRACE_AGENT_SRC(소스 zip 주소), TRACE_CODE(인자 대신 코드)
 param([string]$Code = $env:TRACE_CODE)
 
@@ -19,7 +19,7 @@ function Invoke-TraceAgent([string]$Code) {
   $api = if ($env:TRACE_API_URL) { $env:TRACE_API_URL } else { 'https://gakdo.site' }
   $ref = if ($env:TRACE_AGENT_REF) { $env:TRACE_AGENT_REF } else { 'develop' }
   $home_ = if ($env:TRACE_AGENT_HOME) { $env:TRACE_AGENT_HOME } else { Join-Path $env:LOCALAPPDATA 'trace-agent' }
-  $src = if ($env:TRACE_AGENT_SRC) { $env:TRACE_AGENT_SRC } else { "https://codeload.github.com/GAKDO/agent/zip/refs/heads/$ref" }
+  $src = if ($env:TRACE_AGENT_SRC) { $env:TRACE_AGENT_SRC } else { "https://codeload.github.com/GAKDO/agent/zip/$ref" }
 
   if ($Code -and $Code -notmatch '^\d{6}$') {
     Write-Host '페어링 코드는 6자리 숫자예요.' -ForegroundColor Red
