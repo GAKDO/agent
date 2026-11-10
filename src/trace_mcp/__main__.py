@@ -13,7 +13,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="trace-mcp", description="TRACE 사용자용 MCP 서버")
     parser.add_argument("command", nargs="?", default="serve", choices=["serve", "login", "logout"])
     args = parser.parse_args(argv)
-    client = TraceClient()
+    try:
+        client = TraceClient()
+    except ValueError as err:
+        print(f"설정 오류: {err}", file=sys.stderr)
+        return 1
     if args.command == "login":
         email = input("이메일: ").strip()
         try:

@@ -147,3 +147,31 @@ def test_로그아웃은_서버_호출이_실패해도_로컬_세션을_지운�
     with pytest.raises(ApiError):
         client.logout()
     assert not client.path.exists()
+
+
+def test_리디렉션은_따라가지_않아_토큰이_다른_주소로_가지_않는다() -> None:
+    import email.message
+    import io
+    import urllib.request
+    import urllib.response
+
+    from trace_mcp import client as mod
+
+    class Redirecting(urllib.request.BaseHandler):
+        handler_order = 100  # 진짜 HTTPS 연결보다 먼저
+
+        def https_open(self, req: urllib.request.Request) -> object:
+            hdrs = email.message.Message()
+            hdrs["Location"] = "http://evil.example/"
+            resp = urllib.response.addinfourl(io.BytesIO(b""), hdrs, req.full_url, 302)
+            resp.msg = "Found"
+            return resp
+
+    opener = urllib.request.build_opener(mod._NoRedirect, Redirecting)
+    old = mod._OPENER
+    mod._OPENER = opener
+    try:
+        resp = mod.http_request("GET", "https://gakdo.example/api/v1/auth/me", {"Authorization": "Bearer x"}, None)
+    finally:
+        mod._OPENER = old
+    assert resp.status == 302

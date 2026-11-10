@@ -35,10 +35,20 @@ class ApiError(Exception):
         self.status, self.code, self.title = status, code, title
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """리디렉션을 따라가지 않는다. urllib은 Authorization·Cookie를 다른 주소로도 그대로 넘기기 때문이다."""
+
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def http_request(method: str, url: str, headers: dict[str, str], data: bytes | None) -> Response:
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with _OPENER.open(req, timeout=30) as resp:
             raw, status, hdrs = resp.read(), resp.status, resp.headers
     except urllib.error.HTTPError as err:
         raw, status, hdrs = err.read(), err.code, err.headers
