@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -30,11 +31,14 @@ def save(path: Path, session: Session) -> None:
     if not path.parent.exists():  # 새로 만든 폴더만 700으로(이미 있는 폴더 권한은 건드리지 않음)
         path.parent.mkdir(parents=True, mode=0o700)
         os.chmod(path.parent, 0o700)
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        json.dump(asdict(session), f)
-    os.replace(tmp, path)  # 쓰는 도중 끊겨도 기존 세션이 잘리지 않게 한 번에 바꾼다
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")  # 고유 이름, 0600으로 독점 생성
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(asdict(session), f)
+        os.replace(tmp, path)  # 쓰는 도중 끊겨도 기존 세션이 잘리지 않게 한 번에 바꾼다
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
 
 
 def clear(path: Path) -> None:
