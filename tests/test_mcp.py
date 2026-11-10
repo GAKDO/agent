@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import stat
 from pathlib import Path
 
@@ -64,7 +65,8 @@ def test_로그인하면_세션을_600_파일에_저장한다(client: TraceClien
     assert client.login("me@example.com", "pw") == "CUSTOMER"
     saved = sess.load(client.path)
     assert saved == sess.Session("access-1", "refresh-1")
-    assert stat.S_IMODE(client.path.stat().st_mode) == 0o600
+    if os.name == "posix":  # Windows에는 유닉스 권한 비트가 없다(사용자 프로필 폴더 ACL에 기댄다)
+        assert stat.S_IMODE(client.path.stat().st_mode) == 0o600
 
 
 def test_로그인_전에는_안내_오류를_낸다(client: TraceClient) -> None:

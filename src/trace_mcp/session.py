@@ -1,4 +1,4 @@
-"""로그인 세션 파일(~/.trace-mcp/session.json, 권한 600). 토큰은 이 파일에만 두고 출력하지 않는다."""
+"""로그인 세션 파일(~/.trace-mcp/session.json, 권한 600, Windows는 사용자 프로필 폴더 권한). 토큰은 이 파일에만 두고 출력하지 않는다."""
 
 from __future__ import annotations
 
