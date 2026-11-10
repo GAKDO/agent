@@ -42,6 +42,8 @@ def http_request(method: str, url: str, headers: dict[str, str], data: bytes | N
             raw, status, hdrs = resp.read(), resp.status, resp.headers
     except urllib.error.HTTPError as err:
         raw, status, hdrs = err.read(), err.code, err.headers
+    except OSError as err:  # URLError·TimeoutError·연결 끊김
+        raise ApiError(503, "NETWORK_ERROR", "게이트웨이에 연결하지 못했습니다") from err
     try:
         body = json.loads(raw) if raw else None
     except ValueError:
@@ -97,16 +99,20 @@ class TraceClient:
 
     def logout(self) -> None:
         current = sess.load(self.path)
-        if current:
-            self._call("POST", "/auth/logout", {"Authorization": f"Bearer {current.access_token}"})
-        sess.clear(self.path)
+        try:
+            if current:
+                self._call("POST", "/auth/logout", {"Authorization": f"Bearer {current.access_token}"})
+        finally:
+            sess.clear(self.path)  # 서버 호출이 실패해도 로컬 토큰은 지운다
 
     def _refresh(self, current: sess.Session) -> sess.Session | None:
         if not current.refresh_token:
             return None
         resp = self._call("POST", "/auth/refresh", {"Cookie": f"{REFRESH_COOKIE}={current.refresh_token}"})
+        if resp.status in (401, 403):
+            return None  # 리프레시 토큰 거부: 다시 로그인해야 한다
         if resp.status != 200 or not isinstance(resp.body, dict):
-            return None
+            raise _error(resp)  # 일시 오류는 만료로 취급하지 않는다
         new = sess.Session(resp.body["accessToken"], refresh_from(resp.set_cookies) or current.refresh_token)
         sess.save(self.path, new)
         return new

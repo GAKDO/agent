@@ -24,7 +24,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"로그인됨({role}). 세션은 {client.path}에만 저장했습니다.")
         return 0
     if args.command == "logout":
-        client.logout()
+        try:
+            client.logout()
+        except ApiError as err:
+            print(f"서버 로그아웃은 실패했지만({err.code}) 이 컴퓨터의 세션은 지웠습니다.", file=sys.stderr)
+            return 0
         print("로그아웃했습니다.")
         return 0
     from trace_mcp.server import build  # MCP SDK는 서버를 띄울 때만 불러온다

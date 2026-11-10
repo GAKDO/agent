@@ -120,3 +120,30 @@ def test_MCP_서버는_읽기_전용_도구_7개를_노출한다(client: TraceCl
     assert names == {"whoami", "list_my_rentals", "get_rental", "get_inspection",
                      "get_diagnostics", "get_device_model", "summarize_rental"}
     assert all(t.annotations and t.annotations.read_only_hint for t in listed)
+
+
+def test_리프레시가_일시_오류면_만료가_아니라_그_오류를_알린다(client: TraceClient, gw: FakeGateway) -> None:
+    sess.save(client.path, sess.Session("old", "refresh-1"))
+    real = gw.__call__
+
+    def flaky(method: str, url: str, headers: dict[str, str], data: bytes | None) -> Response:
+        if url.endswith("/auth/refresh"):
+            return Response(503, {"code": "UNAVAILABLE"})
+        return real(method, url, headers, data)
+
+    client.http = flaky
+    with pytest.raises(ApiError) as err:
+        tools.list_my_rentals(client)
+    assert err.value.code == "UNAVAILABLE"
+
+
+def test_로그아웃은_서버_호출이_실패해도_로컬_세션을_지운다(client: TraceClient) -> None:
+    sess.save(client.path, sess.Session("a", "r"))
+
+    def down(method: str, url: str, headers: dict[str, str], data: bytes | None) -> Response:
+        raise ApiError(503, "NETWORK_ERROR")
+
+    client.http = down
+    with pytest.raises(ApiError):
+        client.logout()
+    assert not client.path.exists()
