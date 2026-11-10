@@ -76,3 +76,26 @@ python -m ruff check . && python -m pytest
 |---|---|---|
 | `python-ci` | PR, develop·main push | ruff + pytest (ubuntu·macos·windows) |
 | `비밀값 검사`·`release`·알림 | | 다른 레포와 같음 |
+
+## 사용자용 MCP 서버 (`trace-mcp`)
+
+Claude Desktop·Claude Code 같은 MCP 클라이언트에서 내 렌탈과 시점별 검사·진단 결과를 물어볼 수 있는 로컬 MCP 서버(stdio)입니다. 도구는 모두 읽기 전용이고, 로그인한 사용자 권한으로 게이트웨이(`TRACE_API_URL`, 기본 `https://gakdo.site/`)만 부릅니다.
+
+```sh
+python -m pip install -e ".[mcp]"
+trace-mcp login      # 이메일·비밀번호 입력. 세션은 ~/.trace-mcp/session.json(권한 600)에만 저장
+claude mcp add trace -- trace-mcp    # Claude Code. Desktop은 설정 파일 mcpServers에 command "trace-mcp"
+trace-mcp logout
+```
+
+| 도구 | 하는 일 | API |
+|---|---|---|
+| `whoami` | 내 계정 정보 | `GET /auth/me` |
+| `list_my_rentals` | 내 렌탈 목록(status로 거름) | `GET /rentals` |
+| `get_rental` | 렌탈과 출고·수령·반납 시점 상태 | `GET /rentals/{id}` |
+| `get_inspection` | 시점별 흠집·신규 판정·등급 | `GET /captures/checkpoints/{id}/inspection` |
+| `get_diagnostics` | 시점별 진단 요약·이전 시점 비교·플래그 | `GET /diagnostics/checkpoints/{id}` |
+| `get_device_model` | 기종과 치수 | `GET /device-models/{code}` |
+| `summarize_rental` | 위 결과를 렌탈 하나로 모은 요약 | 위 API 조합 |
+
+챗봇은 `trace_mcp.tools`의 함수를 그대로 불러 같은 조회를 할 수 있습니다.
