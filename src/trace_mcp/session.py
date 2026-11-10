@@ -29,7 +29,7 @@ def load(path: Path) -> Session | None:
 
 def save(path: Path, session: Session) -> None:
     if not path.parent.exists():  # 새로 만든 폴더만 700으로(이미 있는 폴더 권한은 건드리지 않음)
-        path.parent.mkdir(parents=True, mode=0o700)
+        path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)  # 동시에 만들어도 실패하지 않게
         os.chmod(path.parent, 0o700)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")  # 고유 이름, 0600으로 독점 생성
     try:
