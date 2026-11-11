@@ -97,6 +97,8 @@ def run(argv: tuple[str, ...], timeout: float = 60) -> Output:
         done = subprocess.run(argv, capture_output=True, text=True, errors="replace", timeout=timeout, check=False)
     except FileNotFoundError:
         return Output(argv, None, "", "명령 없음")
+    except OSError as exc:  # 권한·보안 제품이 실행을 막아도 그 항목만 읽지 못함으로 두고 계속한다
+        return Output(argv, None, "", f"실행 실패: {exc}")
     except subprocess.TimeoutExpired:
         return Output(argv, None, "", "시간 초과")
     return Output(argv, done.returncode, done.stdout, done.stderr)

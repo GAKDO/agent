@@ -258,3 +258,8 @@ def test_기본_기능이_가동_시간_없이_Wear_0만_주면_믿지_않고_UN
     assert collected["storage"]["skippedReason"] == "UNSUPPORTED"
     assert collected["storage"]["percentageUsed"] is None
     assert report_error_free(collected)
+
+
+def test_배터리_조회가_비어도_PowerOnline이_false면_전원_없음으로_본다() -> None:
+    status = json.dumps([{"PowerOnline": False}])
+    assert windows.parse_conditions("", status, "100", "60")["acPower"] is False

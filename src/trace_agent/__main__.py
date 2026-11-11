@@ -132,8 +132,12 @@ def _run(args: argparse.Namespace, env: Mapping[str, str], ask: Callable[[str], 
         _wait_for_power(collected, lambda: system.power(run), ask)
     if collected["conditions"]["acPower"]:
         print("벤치마크를 돌려요. 1분쯤 걸리니 전원을 연결한 채로 기다려 주세요.", flush=True)
-    benches, skipped = benchmark.run(collected["conditions"]["acPower"], workloads,
-                                     progress=lambda line: print("  " + line, flush=True))
+    try:
+        benches, skipped = benchmark.run(collected["conditions"]["acPower"], workloads,
+                                         progress=lambda line: print("  " + line, flush=True))
+    except (OSError, RuntimeError) as err:  # 디스크 부족(OSError)·프로세스 풀(BrokenProcessPool) 오류가 나도 이미 수집한 진단은 남긴다
+        print(f"벤치마크를 끝내지 못해 건너뛰어요: {err}", file=sys.stderr)
+        benches, skipped = [], "TOOL_ERROR"
     collected_at = clock()
     doc = report.assemble(collected, agent_version=__version__, collected_at=collected_at, consented_at=collected_at,
                           benchmarks=benches, benchmark_skipped_reason=skipped)

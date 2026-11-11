@@ -188,10 +188,10 @@ def _remove_report() -> None:
 def parse_conditions(battery: str, status: str, processes: str, uptime: str) -> dict[str, Any]:
     batteries = rows(battery)
     online = [s.get("PowerOnline") for s in rows(status) if isinstance(s.get("PowerOnline"), bool)]
-    if not batteries:
-        ac = True  # 배터리가 없으면 늘 전원에 꽂혀 있다
-    elif online:
+    if online:
         ac = any(online)
+    elif not batteries:
+        ac = True  # 배터리도 PowerOnline도 없으면 데스크톱으로 보고 전원에 꽂혀 있다고 본다
     else:
         ac = any(b.get("BatteryStatus") in (2, 6, 7, 8, 9) for b in batteries)  # Win32_Battery: 2=AC, 6~9=충전 중
     pct = _int(batteries[0].get("EstimatedChargeRemaining")) if batteries else None

@@ -21,6 +21,12 @@ main에 버전이 적힌 CHANGELOG가 올라가면 release.yml이 태그와 GitH
 ### 바꿈
 - 한 줄 설치 스크립트가 기본으로 `develop` 대신 태그 `v0.2.0`을 받음(`TRACE_AGENT_REF`로 바꿀 수 있음)
 
+### 고침
+- 업로드가 3xx를 따라가지 않음(에이전트 JWT가 다른 주소로 가지 않게), 200인데 본문이 객체가 아니면 저장 후 재전송 경로로
+- 명령 실행이 권한·보안 제품에 막혀도(OSError) 그 항목만 읽지 못함으로 두고 계속
+- Windows: 배터리 조회가 비어도 PowerOnline 값을 먼저 봄
+- 벤치마크가 디스크·프로세스 오류로 실패해도 TOOL_ERROR로 건너뛰고 진단은 남김
+
 ### 추가
 - 잠금·디스크 상태 올리기(contracts 11/7 추가): 진단 JSON에 `checks`{activationLock, diskEncryption, osDiskHealth}를 ON·OFF·OK·WARNING 코드로 실음. 못 읽으면 null
 - 반납 점검 경고(요약): macOS 활성화 잠금·FileVault·OS SMART 상태, Windows BitLocker

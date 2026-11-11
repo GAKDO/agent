@@ -228,15 +228,14 @@ def test_키_없이_올리는_JSON은_보내기_전에_본문과_키를_함께_�
 
 def test_응답_본문이_JSON이_아니면_UploadError로_바꾼다(monkeypatch):
     import io
-    import urllib.request
 
     from trace_agent import upload
 
     class Resp(io.BytesIO):
         status = 200
 
-    for raw in (b"<html>", b"\xff"):
-        monkeypatch.setattr(urllib.request, "urlopen", lambda *_a, _raw=raw, **_k: Resp(_raw))
+    for raw in (b"<html>", b"\xff", b"[]", b"null"):
+        monkeypatch.setattr(upload._OPENER, "open", lambda *_a, _raw=raw, **_k: Resp(_raw))
         with pytest.raises(upload.UploadError):
             upload.http_post("https://api.test/x", {}, {})
 
@@ -255,7 +254,7 @@ def test_오류_본문을_읽다_끊기면_UploadError로_바꾼다(monkeypatch)
     def raise_http(*_a, **_k):
         raise Broken("https://api.test/x", 503, "x", {}, io.BytesIO(b""))  # type: ignore[arg-type]
 
-    monkeypatch.setattr(urllib.request, "urlopen", raise_http)
+    monkeypatch.setattr(upload._OPENER, "open", raise_http)
     with pytest.raises(upload.UploadError):
         upload.http_post("https://api.test/x", {}, {})
 
@@ -282,13 +281,12 @@ def test_잘못_인코딩된_오류_응답은_빈_본문으로_읽는다(monkeyp
     def raise_http(*_a, **_k):
         raise urllib.error.HTTPError("https://api.test/x", 503, "x", {}, io.BytesIO(b"\xff"))  # type: ignore[arg-type]
 
-    monkeypatch.setattr(urllib.request, "urlopen", raise_http)
+    monkeypatch.setattr(upload._OPENER, "open", raise_http)
     assert upload.http_post("https://api.test/x", {}, {}) == (503, {})
 
 
 def test_응답이_Content_Length보다_일찍_끝나면_UploadError로_바꾼다(monkeypatch):
     import http.client
-    import urllib.request
 
     from trace_agent import upload
 
@@ -304,6 +302,16 @@ def test_응답이_Content_Length보다_일찍_끝나면_UploadError로_바꾼�
         def read(self) -> bytes:
             raise http.client.IncompleteRead(b"{", 10)
 
-    monkeypatch.setattr(urllib.request, "urlopen", lambda *_a, **_k: Short())
+    monkeypatch.setattr(upload._OPENER, "open", lambda *_a, **_k: Short())
     with pytest.raises(upload.UploadError):
         upload.http_post("https://api.test/x", {}, {})
+
+
+def test_리다이렉트는_따라가지_않아_토큰이_다른_곳으로_가지_않는다():
+    import urllib.request
+
+    from trace_agent import upload
+
+    req = urllib.request.Request("https://api.test/x", headers={"Authorization": "Bearer t"})
+    handler = upload._NoRedirect()
+    assert handler.redirect_request(req, None, 302, "Found", {}, "http://evil.test/") is None

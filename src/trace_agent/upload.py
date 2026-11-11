@@ -40,12 +40,22 @@ class UploadError(Exception):
         self.status, self.code = status, code
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """3xx를 따라가지 않는다(HTTPError로 받아 실패로 처리). 따라가면 Authorization(에이전트 JWT)이 다른 호스트·http 주소로 넘어갈 수 있다."""
+
+    def redirect_request(self, *_args: Any, **_kwargs: Any) -> None:
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def http_post(url: str, body: dict[str, Any], headers: dict[str, str]) -> tuple[int, dict[str, Any]]:
     req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
                                  headers={"Content-Type": "application/json", **headers})
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return resp.status, json.loads(resp.read() or b"{}")
+        with _OPENER.open(req, timeout=30) as resp:
+            status, data = resp.status, json.loads(resp.read() or b"{}")
     except urllib.error.HTTPError as err:
         try:
             body = json.loads(err.read() or b"{}")
@@ -64,6 +74,9 @@ def http_post(url: str, body: dict[str, Any], headers: dict[str, str]) -> tuple[
     except (OSError, ValueError, http.client.HTTPException) as err:
         # 응답을 읽다 끊기거나(시간 초과·IncompleteRead 포함) 본문이 JSON·UTF-8이 아니면, 서버가 처리했을 수 있으니 같은 키로 다시 올리게 한다
         raise UploadError(0, "BAD_RESPONSE", str(err)) from err
+    if not isinstance(data, dict):  # 200인데 []·null이면 호출한 쪽 .get()이 깨지므로 저장 경로로 넘긴다
+        raise UploadError(status, "BAD_RESPONSE", "응답 본문이 JSON 객체가 아니에요")
+    return status, data
 
 
 def _fail(status: int, body: dict[str, Any]) -> UploadError:
