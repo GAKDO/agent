@@ -1,0 +1,437 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/GAKDO/contracts/main/schemas/codes.gen.schema.json",
+  "title": "TRACE 코드 값 (생성)",
+  "description": "생성 파일입니다. 손으로 고치지 말고 codes.yaml을 고친 뒤 python3 scripts/gen_schema_codes.py로 다시 만드세요. (codes.yaml version 1.0.0)",
+  "$defs": {
+    "RentalStatus": {
+      "type": "string",
+      "enum": [
+        "OPEN",
+        "RETURNED",
+        "CLOSED"
+      ],
+      "description": "codes.yaml rental.status"
+    },
+    "RentalCheckpointType": {
+      "type": "string",
+      "enum": [
+        "OUT",
+        "RCV",
+        "RET"
+      ],
+      "description": "codes.yaml rental.checkpoint_type"
+    },
+    "RentalCheckpointStatus": {
+      "type": "string",
+      "enum": [
+        "OPEN",
+        "CAPTURED",
+        "GRADED",
+        "SEALED"
+      ],
+      "description": "codes.yaml rental.checkpoint_status"
+    },
+    "DeviceOs": {
+      "type": "string",
+      "enum": [
+        "MACOS",
+        "WINDOWS"
+      ],
+      "description": "codes.yaml device.os"
+    },
+    "DeviceStatus": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "MAINTENANCE",
+        "RETIRED"
+      ],
+      "description": "codes.yaml device.status"
+    },
+    "DeviceFormFactor": {
+      "type": "string",
+      "enum": [
+        "CLAMSHELL"
+      ],
+      "description": "codes.yaml device.form_factor"
+    },
+    "CaptureSource": {
+      "type": "string",
+      "enum": [
+        "BOOTH",
+        "PHONE"
+      ],
+      "description": "codes.yaml capture.source"
+    },
+    "CaptureSetStatus": {
+      "type": "string",
+      "enum": [
+        "UPLOADING",
+        "UPLOADED",
+        "INSPECTED",
+        "GRADED"
+      ],
+      "description": "codes.yaml capture.set_status"
+    },
+    "CaptureQuality": {
+      "type": "string",
+      "enum": [
+        "OK",
+        "UNJUDGEABLE"
+      ],
+      "description": "codes.yaml capture.quality"
+    },
+    "CaptureFace": {
+      "type": "string",
+      "enum": [
+        "TOP",
+        "BOT",
+        "SF",
+        "SB",
+        "SL",
+        "SR",
+        "KB",
+        "SCR0",
+        "SCR1"
+      ],
+      "description": "codes.yaml capture.face"
+    },
+    "CaptureFaceRequiredBooth": {
+      "type": "string",
+      "enum": [
+        "TOP",
+        "BOT",
+        "SF",
+        "SB",
+        "SL",
+        "SR",
+        "KB",
+        "SCR0"
+      ],
+      "description": "codes.yaml capture.face_required.BOOTH"
+    },
+    "CaptureFaceRequiredPhone": {
+      "type": "string",
+      "enum": [
+        "TOP",
+        "BOT",
+        "SF",
+        "SB",
+        "SL",
+        "SR",
+        "SCR0"
+      ],
+      "description": "codes.yaml capture.face_required.PHONE"
+    },
+    "CaptureProfile": {
+      "type": "string",
+      "enum": [
+        "FULL",
+        "QUICK"
+      ],
+      "description": "codes.yaml capture.profile"
+    },
+    "CaptureFaceRequiredQuickBooth": {
+      "type": "string",
+      "enum": [
+        "TOP",
+        "BOT"
+      ],
+      "description": "codes.yaml capture.face_required_quick.BOOTH"
+    },
+    "CaptureLight": {
+      "type": "string",
+      "enum": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "ROOM",
+        "OFF"
+      ],
+      "description": "codes.yaml capture.light"
+    },
+    "CaptureCamera": {
+      "type": "string",
+      "enum": [
+        "CAM1",
+        "CAM2",
+        "PHONE"
+      ],
+      "description": "codes.yaml capture.camera"
+    },
+    "InspectionAlignmentMethod": {
+      "type": "string",
+      "enum": [
+        "CONTOUR",
+        "LIGHTGLUE"
+      ],
+      "description": "codes.yaml inspection.alignment_method"
+    },
+    "InspectionDefectClass": {
+      "type": "string",
+      "enum": [
+        "scratch",
+        "dent",
+        "crack",
+        "stain"
+      ],
+      "description": "codes.yaml inspection.defect_class"
+    },
+    "InspectionDefectSource": {
+      "type": "string",
+      "enum": [
+        "AUTO",
+        "HUMAN"
+      ],
+      "description": "codes.yaml inspection.defect_source"
+    },
+    "InspectionMatchStatus": {
+      "type": "string",
+      "enum": [
+        "NEW",
+        "EXISTING"
+      ],
+      "description": "codes.yaml inspection.match_status"
+    },
+    "InspectionGrade": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "description": "codes.yaml inspection.grade"
+    },
+    "DiagnosticsComponentKind": {
+      "type": "string",
+      "enum": [
+        "CPU",
+        "RAM",
+        "SSD",
+        "BATTERY",
+        "DISPLAY",
+        "OTHER"
+      ],
+      "description": "codes.yaml diagnostics.component_kind"
+    },
+    "DiagnosticsCapacityUnit": {
+      "type": "string",
+      "enum": [
+        "mAh",
+        "mWh"
+      ],
+      "description": "codes.yaml diagnostics.capacity_unit"
+    },
+    "DiagnosticsBenchmarkMetric": {
+      "type": "string",
+      "enum": [
+        "CPU_SINGLE",
+        "CPU_MULTI",
+        "MEM_COPY",
+        "DISK_READ",
+        "DISK_WRITE"
+      ],
+      "description": "codes.yaml diagnostics.benchmark_metric"
+    },
+    "DiagnosticsFlagKind": {
+      "type": "string",
+      "enum": [
+        "COMPONENT_CHANGED",
+        "CAPACITY_DROP",
+        "BENCH_DROP",
+        "ACTIVATION_LOCK_ON",
+        "DISK_ENCRYPTION_ON",
+        "DISK_HEALTH_WARNING"
+      ],
+      "description": "codes.yaml diagnostics.flag_kind"
+    },
+    "DiagnosticsBatteryStatus": {
+      "type": "string",
+      "enum": [
+        "OK",
+        "SKIPPED",
+        "NO_BATTERY"
+      ],
+      "description": "codes.yaml diagnostics.battery_status"
+    },
+    "DiagnosticsStorageStatus": {
+      "type": "string",
+      "enum": [
+        "OK",
+        "SKIPPED"
+      ],
+      "description": "codes.yaml diagnostics.storage_status"
+    },
+    "DiagnosticsSkippedReason": {
+      "type": "string",
+      "enum": [
+        "NO_PERMISSION",
+        "UNSUPPORTED",
+        "TOOL_ERROR",
+        "NO_AC_POWER"
+      ],
+      "description": "codes.yaml diagnostics.skipped_reason"
+    },
+    "DiagnosticsStorageProtocol": {
+      "type": "string",
+      "enum": [
+        "NVME",
+        "ATA"
+      ],
+      "description": "codes.yaml diagnostics.storage_protocol"
+    },
+    "DiagnosticsBatteryCondition": {
+      "type": "string",
+      "enum": [
+        "NORMAL",
+        "SERVICE_RECOMMENDED"
+      ],
+      "description": "codes.yaml diagnostics.battery_condition"
+    },
+    "DiagnosticsThermalState": {
+      "type": "string",
+      "enum": [
+        "NOMINAL",
+        "FAIR",
+        "SERIOUS",
+        "CRITICAL"
+      ],
+      "description": "codes.yaml diagnostics.thermal_state"
+    },
+    "DiagnosticsLockState": {
+      "type": "string",
+      "enum": [
+        "ON",
+        "OFF"
+      ],
+      "description": "codes.yaml diagnostics.lock_state"
+    },
+    "DiagnosticsDiskHealth": {
+      "type": "string",
+      "enum": [
+        "OK",
+        "WARNING"
+      ],
+      "description": "codes.yaml diagnostics.disk_health"
+    },
+    "MlSplit": {
+      "type": "string",
+      "enum": [
+        "TRAIN",
+        "VAL",
+        "TEST"
+      ],
+      "description": "codes.yaml ml.split"
+    },
+    "ReportChainStatus": {
+      "type": "string",
+      "enum": [
+        "VALID",
+        "BROKEN",
+        "PENDING"
+      ],
+      "description": "codes.yaml report.chain_status"
+    },
+    "ReportProgressStage": {
+      "type": "string",
+      "enum": [
+        "UPLOADED",
+        "ALIGNED",
+        "INSPECTED",
+        "GRADED",
+        "SEALED"
+      ],
+      "description": "codes.yaml report.progress_stage"
+    },
+    "AuthRole": {
+      "type": "string",
+      "enum": [
+        "ADMIN",
+        "CUSTOMER"
+      ],
+      "description": "codes.yaml auth.role"
+    },
+    "AuthAccountStatus": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "ACTIVE",
+        "WITHDRAWN"
+      ],
+      "description": "codes.yaml auth.account_status"
+    },
+    "AuthEmailTokenPurpose": {
+      "type": "string",
+      "enum": [
+        "VERIFY",
+        "RESET"
+      ],
+      "description": "codes.yaml auth.email_token_purpose"
+    },
+    "AuthClientKind": {
+      "type": "string",
+      "enum": [
+        "BOOTH"
+      ],
+      "description": "codes.yaml auth.client_kind"
+    },
+    "AuthTokenRole": {
+      "type": "string",
+      "enum": [
+        "ADMIN",
+        "CUSTOMER",
+        "BOOTH",
+        "AGENT"
+      ],
+      "description": "codes.yaml auth.token_role"
+    },
+    "ErrorCode": {
+      "type": "string",
+      "enum": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "FORBIDDEN",
+        "OUT_OF_SCOPE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "IDEMPOTENCY_KEY_CONFLICT",
+        "INTERNAL_ERROR",
+        "CONSENT_REQUIRED",
+        "EMAIL_ALREADY_EXISTS",
+        "CODE_INVALID",
+        "CODE_EXPIRED",
+        "RESEND_TOO_SOON",
+        "INVALID_CREDENTIALS",
+        "EMAIL_NOT_VERIFIED",
+        "REFRESH_INVALID",
+        "CAPTURE_LINK_INVALID",
+        "RENTAL_LINKED_TO_OTHER",
+        "CLIENT_CREDENTIALS_INVALID",
+        "PAIRING_CODE_INVALID",
+        "PAIRING_CODE_EXPIRED",
+        "RENTAL_OPEN_EXISTS",
+        "DEVICE_NOT_ACTIVE",
+        "CHECKPOINT_ORDER_VIOLATION",
+        "RENTAL_NOT_CLOSABLE",
+        "DEVICE_SERIAL_EXISTS",
+        "DEVICE_HAS_OPEN_RENTAL",
+        "DEVICE_STATUS_TRANSITION_INVALID",
+        "PILOT_ALIAS_EXISTS",
+        "NOT_TEST_DATA",
+        "BOOTH_CODE_INVALID",
+        "BOOTH_CODE_EXPIRED",
+        "CAPTURE_FACES_MISSING",
+        "CAPTURE_HASH_MISMATCH",
+        "CAPTURE_SET_CLOSED",
+        "DIAGNOSTIC_ALREADY_UPLOADED",
+        "DIAGNOSTIC_SCHEMA_INVALID",
+        "DEVICE_SERIAL_MISMATCH",
+        "RECORD_ALREADY_SEALED"
+      ],
+      "description": "codes.yaml error_code"
+    }
+  }
+}

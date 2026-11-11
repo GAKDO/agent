@@ -1,0 +1,12 @@
+[
+    {
+        "Name":  "Intel(R) Iris(R) Xe Graphics",
+        "CurrentHorizontalResolution":  2560,
+        "CurrentVerticalResolution":  1600
+    },
+    {
+        "Name":  "Microsoft Remote Display Adapter",
+        "CurrentHorizontalResolution":  null,
+        "CurrentVerticalResolution":  null
+    }
+]
