@@ -8,14 +8,14 @@
 # TRACE_API_URL을 채워 `python3 -m trace_agent run --code <코드>`를 실행한다.
 # 결과를 화면에 보여 주고 y를 넣어야 올린다. 비밀값은 이 파일에 없다(페어링 코드는 5분짜리 일회용).
 #
-# 바꿀 수 있는 값(환경 변수): TRACE_API_URL(기본 https://gakdo.site), TRACE_AGENT_REF(브랜치나 태그, 기본 develop),
+# 바꿀 수 있는 값(환경 변수): TRACE_API_URL(기본 https://gakdo.site), TRACE_AGENT_REF(브랜치나 태그, 기본 v0.2.0. 최신 개발본은 develop),
 # TRACE_AGENT_HOME(기본 ~/.trace-agent), TRACE_AGENT_SRC(소스 tar.gz 주소), TRACE_AGENT_PYTHON_URL(받을 파이썬 tar.gz),
 # TRACE_AGENT_NO_SMARTCTL=1(macOS에서 smartctl을 받지 않음)
 set -eu
 
 CODE="${1:-}"
 API="${TRACE_API_URL:-https://gakdo.site}"
-REF="${TRACE_AGENT_REF:-develop}"
+REF="${TRACE_AGENT_REF:-v0.2.0}"
 HOME_DIR="${TRACE_AGENT_HOME:-$HOME/.trace-agent}"
 SRC="${TRACE_AGENT_SRC:-https://codeload.github.com/GAKDO/agent/tar.gz/$REF}"
 

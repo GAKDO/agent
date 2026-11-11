@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "TRACE agent: 진단 에이전트: 렌탈 노트북의 부품·배터리·SSD·벤치마크를 읽어 동의 후 올린다 (macOS·Windows)"
 requires-python = ">=3.11"
 dependencies = ["jsonschema>=4.18"]

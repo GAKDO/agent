@@ -23,9 +23,9 @@ smartctl을 받지 않으려면 `curl -fsSL https://gakdo.site/agent.sh | TRACE_
 ```
 
 - 스크립트: `install/agent.sh`, `install/agent.ps1`. 소스는 `~/.trace-agent`(Windows는 `%LOCALAPPDATA%\trace-agent`)에 풀리고 진단 JSON도 거기 남는다
-- `/agent.sh`·`/agent.ps1`은 web nginx가 `raw.githubusercontent.com/GAKDO/agent/develop/install/...`로 302 넘긴다
+- `/agent.sh`·`/agent.ps1`은 web nginx가 `raw.githubusercontent.com/GAKDO/agent/v0.2.0/install/...`로 302 넘긴다
 - 다른 서버로 올릴 때: `curl -fsSL <화면>/agent.sh | TRACE_API_URL=<API 주소> sh -s 123456`(변수는 `sh` 쪽에 붙인다)
-- 환경 변수: `TRACE_API_URL`, `TRACE_AGENT_REF`(받을 브랜치나 태그, 기본 develop. 프리즈 때 태그로 고정 예정), `TRACE_AGENT_HOME`, `TRACE_AGENT_SRC`, `TRACE_AGENT_PYTHON_URL`
+- 환경 변수: `TRACE_API_URL`, `TRACE_AGENT_REF`(받을 브랜치나 태그, 기본 `v0.2.0`. 최신 개발본을 받으려면 `develop`), `TRACE_AGENT_HOME`, `TRACE_AGENT_SRC`, `TRACE_AGENT_PYTHON_URL`
 
 ## 실행 (macOS)
 
