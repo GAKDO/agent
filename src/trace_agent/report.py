@@ -50,12 +50,18 @@ def assemble(collected: dict[str, Any], *, agent_version: str, collected_at: str
 _LOCK_CODE = {"켜짐": "ON", "꺼짐": "OFF"}
 
 
-def upload_checks(checks: dict[str, Any]) -> dict[str, str | None]:
-    """요약용 잠금 상태(켜짐·꺼짐·None) → 계약 checks 코드 값. 디스크 암호화는 macOS FileVault, Windows BitLocker."""
+def upload_checks(checks: dict[str, Any]) -> dict[str, Any]:
+    """요약용 잠금 상태(켜짐·꺼짐·None) → 계약 checks 코드 값. 디스크 암호화는 macOS FileVault, Windows BitLocker.
+    보안 상태·위협 건수(11/12 선택 필드)는 읽었을 때만 넣는다. 못 읽은 값은 키를 빼서 옛 서버도 받게 한다."""
     encryption = checks.get("fileVault") if "fileVault" in checks else checks.get("bitLocker")
-    return {"activationLock": _LOCK_CODE.get(checks.get("activationLock") or ""),
-            "diskEncryption": _LOCK_CODE.get(encryption or ""),
-            "osDiskHealth": checks.get("osDiskHealth")}
+    out: dict[str, Any] = {"activationLock": _LOCK_CODE.get(checks.get("activationLock") or ""),
+                           "diskEncryption": _LOCK_CODE.get(encryption or ""),
+                           "osDiskHealth": checks.get("osDiskHealth")}
+    if checks.get("security") in _LOCK_CODE:
+        out["securityProtection"] = _LOCK_CODE[checks["security"]]
+    if isinstance(checks.get("threatCount"), int):
+        out["threatCount"] = checks["threatCount"]
+    return out
 
 
 def errors(doc: dict[str, Any]) -> list[str]:
@@ -123,6 +129,9 @@ def summary(doc: dict[str, Any], checks: dict[str, Any] | None = None) -> str:
                  (("activationLock", "활성화 잠금"), ("fileVault", "FileVault"), ("bitLocker", "BitLocker")) if key in checks]
         if locks:
             lines.append("잠금: " + ", ".join(locks))
+        if "security" in checks:
+            threats = "" if checks.get("threatCount") is None else f", 위협 탐지 기록 {checks['threatCount']}건"
+            lines.append(f"보안 보호: {checks['security'] or '모름'}{threats} (켜짐·꺼짐과 건수만 읽고 파일·프로그램 목록은 읽지 않아요)")
         lines += [f"[주의] {w}" for w in checks.get("warnings", [])]
     lines.append("실행한 명령: " + "; ".join(doc["sources"]))
     return "\n".join(lines)

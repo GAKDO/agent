@@ -6,6 +6,9 @@ main에 버전이 적힌 CHANGELOG가 올라가면 release.yml이 태그와 GitH
 
 ## [Unreleased]
 
+### 추가
+- 보안 상태 점검(11/12, 사업단·기자재 담당자 설문 반영): Windows Microsoft Defender 백신·실시간 보호와 위협 탐지 건수, macOS Gatekeeper·SIP 켜짐 여부를 고정 명령 4개로 읽어 요약에 보이고 진단 JSON `checks.securityProtection`·`threatCount`(contracts #46)로 올린다. 위협 상세·설치 프로그램 목록은 읽지 않는다
+
 ## [0.2.0] - 2026-11-11
 
 **목표: 대회(11/13 코드 프리즈) 시연용 진단 에이전트 고정**

@@ -26,6 +26,8 @@ SMARTCTL = ("smartctl", "-j", "-a", "disk0")
 PS = ("ps", "-A", "-o", "pid=")
 BOOTTIME = ("sysctl", "-n", "kern.boottime")
 FILEVAULT = ("fdesetup", "status")
+GATEKEEPER = ("spctl", "--status")
+SIP = ("csrutil", "status")
 
 _SKIP_NULLS = ("cycleCount", "designCapacity", "fullChargeCapacity", "osMaxCapacityPercent", "osCondition")
 _SSD_NULLS = ("protocol", "percentageUsed", "availableSpare", "criticalWarning", "mediaErrors", "powerOnHours")
@@ -133,6 +135,17 @@ def disk_health(nvme: str) -> str | None:
     return "OK" if all(s.lower() == "verified" for s in statuses) else "WARNING"
 
 
+def security_protection(gatekeeper: str, sip: str) -> str | None:
+    """계약 checks.securityProtection(요약용 켜짐·꺼짐): Gatekeeper(앱 출처 확인)와 SIP(시스템 무결성 보호)가 모두 켜졌으면 켜짐,
+    하나라도 꺼졌으면 꺼짐, 둘 다 확실히 읽지 못하면(SIP 사용자 설정 등) None."""
+    gk = "on" if "assessments enabled" in gatekeeper else "off" if "assessments disabled" in gatekeeper else None
+    sp = sip.lower()
+    sip_state = "on" if "status: enabled" in sp else "off" if "status: disabled" in sp else None
+    if "off" in (gk, sip_state):
+        return "꺼짐"
+    return "켜짐" if gk == sip_state == "on" else None
+
+
 def lock_status(hardware: str) -> str | None:
     """요약에 보일 활성화 잠금 상태. 못 읽으면 None."""
     hw = (_sp_items(hardware, "SPHardwareDataType") or [{}])[0]
@@ -236,7 +249,8 @@ def power(run: Runner) -> dict[str, Any]:
 def collect(run: Runner, now: float | None = None) -> dict[str, Any]:
     """고정 목록 명령을 돌려 진단 JSON 조각(벤치마크·시각 제외)을 만든다."""
     outs = {argv: run(argv) for argv in (HARDWARE, POWER, NVME, DISPLAYS, IOREG_BATTERY, PMSET_BATT,
-                                         PMSET_THERM, SMARTCTL, PS, BOOTTIME, FILEVAULT)}
+                                         PMSET_THERM, SMARTCTL, PS, BOOTTIME, FILEVAULT,
+                                         GATEKEEPER, SIP)}
 
     def text(argv: tuple[str, ...]) -> str:
         return outs[argv].stdout if outs[argv].ok else ""
@@ -247,6 +261,7 @@ def collect(run: Runner, now: float | None = None) -> dict[str, Any]:
     if battery_part:
         components.append(battery_part)
     components += parse_displays(text(DISPLAYS))
+    security = security_protection(text(GATEKEEPER), text(SIP))
     return {
         "os": {"type": "MACOS", "version": platform.mac_ver()[0] or platform.release(), "arch": platform.machine()},
         "device": device,
@@ -261,7 +276,11 @@ def collect(run: Runner, now: float | None = None) -> dict[str, Any]:
                    "fileVault": ("켜짐" if "FileVault is On" in text(FILEVAULT)
                                  else "꺼짐" if "FileVault is Off" in text(FILEVAULT) else None),
                    "osDiskHealth": disk_health(text(NVME)),
-                   "warnings": parse_checks(text(HARDWARE), text(FILEVAULT), text(NVME))},
+                   "security": security,
+                   "threatCount": None,  # macOS는 위협 건수를 읽지 않는다
+                   "warnings": parse_checks(text(HARDWARE), text(FILEVAULT), text(NVME))
+                   + (["Gatekeeper 또는 시스템 무결성 보호(SIP)가 꺼져 있어요. 초기화 전에 켜 주세요"]
+                      if security == "꺼짐" else [])},
     }
 
 

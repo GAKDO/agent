@@ -22,6 +22,9 @@ MACOS: tuple[tuple[str, ...], ...] = (
     ("sysctl", "-n", "kern.boottime"),
     # 반납 점검(계약 checks.diskEncryption): FileVault 켜짐 여부만 한 줄로 준다
     ("fdesetup", "status"),
+    # 보안 상태(계약 checks.securityProtection, 11/12): 켜짐·꺼짐 한 줄만 준다. 앱·파일 목록은 읽지 않는다
+    ("spctl", "--status"),
+    ("csrutil", "status"),
 )
 
 
@@ -60,6 +63,10 @@ WINDOWS: dict[str, tuple[str, ...]] = {
     # sources 한 줄 200자 제한(diag.v1) 때문에 줄인 별칭(gcim·select)을 쓴다
     "BITLOCKER": _ps("gcim -N root/cimv2/Security/MicrosoftVolumeEncryption Win32_EncryptableVolume | "
                      "select DriveLetter,ProtectionStatus" + _JSON),
+    # 보안 상태(계약 checks.securityProtection·threatCount, 11/12): Defender 켜짐 값 두 개와 위협 탐지 '건수'만.
+    # Get-MpThreatDetection 상세(Resources)에는 파일 경로가 들어 있으므로 건수 말고는 꺼내지 않는다
+    "DEFENDER": _ps("Get-MpComputerStatus | Select-Object AntivirusEnabled,RealTimeProtectionEnabled" + _JSON),
+    "THREATS": _ps("@(Get-MpThreatDetection).Count"),
     "SMARTCTL": ("smartctl", "-j", "-a", "/dev/sda"),
     "SMARTCTL_DEFAULT_PATH": (r"C:\Program Files\smartmontools\bin\smartctl.exe", "-j", "-a", "/dev/sda"),
 }

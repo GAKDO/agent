@@ -18,6 +18,8 @@ FILES = {
     macos.PMSET_THERM: "pmset_therm.txt",
     macos.BOOTTIME: "boottime.txt",
     macos.FILEVAULT: "fdesetup.txt",
+    macos.GATEKEEPER: "spctl.txt",
+    macos.SIP: "csrutil.txt",
 }
 PS_745 = "\n".join(str(i) for i in range(1, 746)) + "\n"
 NOW = 1792657819 + 5400  # 부팅 1시간 30분 뒤
