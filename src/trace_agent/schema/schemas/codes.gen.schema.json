@@ -187,6 +187,26 @@
       ],
       "description": "codes.yaml inspection.defect_source"
     },
+    "InspectionReviewStatus": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "CONFIRMED",
+        "DISMISSED"
+      ],
+      "description": "codes.yaml inspection.review_status"
+    },
+    "InspectionDismissReason": {
+      "type": "string",
+      "enum": [
+        "DUST",
+        "TAPE",
+        "REFLECTION",
+        "PART",
+        "OTHER"
+      ],
+      "description": "codes.yaml inspection.dismiss_reason"
+    },
     "InspectionMatchStatus": {
       "type": "string",
       "enum": [
@@ -204,6 +224,15 @@
         "D"
       ],
       "description": "codes.yaml inspection.grade"
+    },
+    "InspectionSettlementStatus": {
+      "type": "string",
+      "enum": [
+        "READY",
+        "PENDING",
+        "NOT_APPLICABLE"
+      ],
+      "description": "codes.yaml inspection.settlement_status"
     },
     "DiagnosticsComponentKind": {
       "type": "string",
@@ -244,7 +273,9 @@
         "BENCH_DROP",
         "ACTIVATION_LOCK_ON",
         "DISK_ENCRYPTION_ON",
-        "DISK_HEALTH_WARNING"
+        "DISK_HEALTH_WARNING",
+        "SECURITY_PROTECTION_OFF",
+        "THREAT_DETECTED"
       ],
       "description": "codes.yaml diagnostics.flag_kind"
     },
@@ -388,6 +419,27 @@
       ],
       "description": "codes.yaml auth.token_role"
     },
+    "AuthSocialProvider": {
+      "type": "string",
+      "enum": [
+        "GOOGLE",
+        "GITHUB",
+        "KAKAO",
+        "NAVER"
+      ],
+      "description": "codes.yaml auth.social_provider"
+    },
+    "AuthSocialLoginError": {
+      "type": "string",
+      "enum": [
+        "UNAVAILABLE",
+        "CANCELLED",
+        "STATE_INVALID",
+        "EMAIL_REQUIRED",
+        "PROVIDER_ERROR"
+      ],
+      "description": "codes.yaml auth.social_login_error"
+    },
     "ErrorCode": {
       "type": "string",
       "enum": [
@@ -412,6 +464,7 @@
         "CLIENT_CREDENTIALS_INVALID",
         "PAIRING_CODE_INVALID",
         "PAIRING_CODE_EXPIRED",
+        "REAUTH_REQUIRED",
         "RENTAL_OPEN_EXISTS",
         "DEVICE_NOT_ACTIVE",
         "CHECKPOINT_ORDER_VIOLATION",
@@ -421,11 +474,16 @@
         "DEVICE_STATUS_TRANSITION_INVALID",
         "PILOT_ALIAS_EXISTS",
         "NOT_TEST_DATA",
+        "DEVICE_IN_USE",
+        "DEVICE_MODEL_IN_USE",
         "BOOTH_CODE_INVALID",
         "BOOTH_CODE_EXPIRED",
         "CAPTURE_FACES_MISSING",
         "CAPTURE_HASH_MISMATCH",
         "CAPTURE_SET_CLOSED",
+        "REVIEW_PENDING_REMAINS",
+        "REVIEW_NOT_READY",
+        "REVIEW_CLOSED",
         "DIAGNOSTIC_ALREADY_UPLOADED",
         "DIAGNOSTIC_SCHEMA_INVALID",
         "DEVICE_SERIAL_MISMATCH",

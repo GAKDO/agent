@@ -24,6 +24,7 @@ PROCESSES, UPTIME, SMARTCTL, SMARTCTL_DEFAULT_PATH = (
     WINDOWS[k] for k in ("PROCESSES", "UPTIME", "SMARTCTL", "SMARTCTL_DEFAULT_PATH"))
 BATTERY_REPORT, BATTERY_REPORT_READ = WINDOWS["BATTERY_REPORT"], WINDOWS["BATTERY_REPORT_READ"]
 RELIABILITY, BITLOCKER = WINDOWS["RELIABILITY"], WINDOWS["BITLOCKER"]
+DEFENDER, THREATS = WINDOWS["DEFENDER"], WINDOWS["THREATS"]
 REPORT_FILE = "trace-battery.xml"  # %TEMP% 안. 읽은 뒤 지운다
 
 # Get-PhysicalDisk는 PowerShell 버전에 따라 숫자나 글자로 준다
@@ -251,10 +252,32 @@ def parse_checks(bitlocker: Output) -> dict[str, Any]:
     return {"bitLocker": "켜짐" if on else "꺼짐", "warnings": warnings}
 
 
+def parse_security(defender: Output, threats: Output) -> dict[str, Any]:
+    """보안 상태(11/12, 계약 checks.securityProtection·threatCount). Defender 백신·실시간 보호가 모두 켜졌으면 켜짐,
+    하나라도 꺼졌으면 꺼짐. 다른 백신을 써서 Defender가 꺼져 있거나 명령이 실패하면 '모름'(None). 위협은 건수만 센다."""
+    status = (rows(defender.stdout) or [{}])[0] if defender.ok else {}
+    values = [status.get(k) for k in ("AntivirusEnabled", "RealTimeProtectionEnabled")]
+    security = "꺼짐" if False in values else "켜짐" if values == [True, True] else None
+    count = _int(threats.stdout.strip()) if threats.ok else None
+    count = count if count is not None and count >= 0 else None
+    warnings = []
+    if security == "꺼짐":
+        warnings.append("Microsoft Defender 백신이나 실시간 보호가 꺼져 있어요. 다른 백신이 없다면 켜 주세요")
+    if count:
+        warnings.append(f"Microsoft Defender에 위협 탐지 기록이 {count}건 있어요. 검사·정리 후 대여해 주세요")
+    return {"security": security, "threatCount": count, "warnings": warnings}
+
+
 def _os_version() -> str:
     """Windows는 platform.version()이 빌드 번호(10.0.22631)다. 다른 OS에서 테스트할 때는 release로 대신한다."""
     version = platform.version() if sys.platform == "win32" else platform.release()
     return (version or "unknown")[:32]
+
+
+def _merge_checks(locks: dict[str, Any], security: dict[str, Any]) -> dict[str, Any]:
+    """요약에 쓰고, report.assemble이 계약 checks로 바꿔 올린다."""
+    return {**locks, "security": security["security"], "threatCount": security["threatCount"],
+            "warnings": locks["warnings"] + security["warnings"]}
 
 
 def power(run: Runner) -> dict[str, Any]:
@@ -268,7 +291,7 @@ def collect(run: Runner) -> dict[str, Any]:
     """고정 목록 명령을 돌려 진단 JSON 조각(벤치마크·시각 제외)을 만든다."""
     outs = {argv: run(argv) for argv in (SYSTEM, BIOS, CPU, MEMORY, DISKS, VIDEO, BATTERY, BATTERY_STATIC,
                                          BATTERY_FULL, BATTERY_CYCLE, BATTERY_STATUS, PROCESSES, UPTIME, SMARTCTL,
-                                         BITLOCKER)}
+                                         BITLOCKER, DEFENDER, THREATS)}
     report = None
     if _needs_report(outs):
         outs[BATTERY_REPORT] = run(BATTERY_REPORT)
@@ -300,5 +323,5 @@ def collect(run: Runner) -> dict[str, Any]:
         "battery": battery,
         "storage": storage,
         "sources": [o.source for o in outs.values()],
-        "checks": parse_checks(outs[BITLOCKER]),  # 요약에 쓰고, report.assemble이 계약 checks로 바꿔 올린다
+        "checks": _merge_checks(parse_checks(outs[BITLOCKER]), parse_security(outs[DEFENDER], outs[THREATS])),
     }
