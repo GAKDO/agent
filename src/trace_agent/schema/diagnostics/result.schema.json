@@ -112,7 +112,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["activationLock", "diskEncryption", "osDiskHealth"],
-      "description": "선택(11/7 추가, schemaVersion은 diag.v1 그대로). 출고·반납 때 직원이 봐야 할 잠금·디스크 상태. 못 읽은 값은 null. 이 칸이 없는 옛 에이전트 진단은 서버가 모두 null로 본다. diagnostics-server는 ON·WARNING이면 점검 플래그(ACTIVATION_LOCK_ON·DISK_ENCRYPTION_ON·DISK_HEALTH_WARNING)를 붙인다.",
+      "description": "선택(11/7 추가, schemaVersion은 diag.v1 그대로. securityProtection·threatCount는 11/12 추가, 선택). 출고·반납 때 직원이 봐야 할 잠금·디스크 상태. 못 읽은 값은 null. 이 칸이 없는 옛 에이전트 진단은 서버가 모두 null로 본다. diagnostics-server는 ON·WARNING이면 점검 플래그(ACTIVATION_LOCK_ON·DISK_ENCRYPTION_ON·DISK_HEALTH_WARNING)를, securityProtection이 OFF면 SECURITY_PROTECTION_OFF, threatCount가 앞 진단보다 늘었으면(첫 진단은 1건 이상이면) THREAT_DETECTED를 붙인다.",
       "properties": {
         "activationLock": {
           "oneOf": [
@@ -134,6 +134,18 @@
             { "type": "null" }
           ],
           "description": "OS가 본 내장 SSD SMART 상태. macOS system_profiler smart_status가 Verified면 OK, 다른 값이면 WARNING. 읽지 못했거나 Windows면 null"
+        },
+        "securityProtection": {
+          "oneOf": [
+            { "$ref": "../schemas/codes.gen.schema.json#/$defs/DiagnosticsLockState" },
+            { "type": "null" }
+          ],
+          "description": "선택(11/12 추가). OS 기본 보안 보호가 모두 켜져 있으면 ON, 하나라도 꺼져 있으면 OFF. Windows는 Microsoft Defender 백신·실시간 보호(Get-MpComputerStatus의 켜짐 값만), macOS는 Gatekeeper(spctl)와 시스템 무결성 보호(csrutil). 읽지 못했거나(다른 백신 사용 등) 옛 에이전트면 null 또는 키 없음. 파일·프로그램 목록은 읽지 않는다"
+        },
+        "threatCount": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "선택(11/12 추가). Windows Defender가 기록한 위협 탐지 건수(Get-MpThreatDetection 건수만, 파일 경로 등 상세는 읽지 않음). macOS·읽지 못함·옛 에이전트면 null 또는 키 없음"
         }
       }
     }

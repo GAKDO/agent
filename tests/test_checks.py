@@ -31,10 +31,12 @@ def test_활성화_잠금이_켜져_있으면_요약에_경고가_보이고_올�
 
 def test_잠금이_모두_꺼져_있으면_경고_없이_꺼짐만_보인다(runner):
     collected = macos.collect(runner)
-    assert collected["checks"] == {"activationLock": "꺼짐", "fileVault": "꺼짐", "osDiskHealth": "OK", "warnings": []}
+    assert collected["checks"] == {"activationLock": "꺼짐", "fileVault": "꺼짐", "osDiskHealth": "OK",
+                                   "security": "켜짐", "threatCount": None, "warnings": []}
     doc = _doc(collected)
     assert "잠금: 활성화 잠금 꺼짐, FileVault 꺼짐" in report.summary(doc, collected["checks"])
-    assert doc["checks"] == {"activationLock": "OFF", "diskEncryption": "OFF", "osDiskHealth": "OK"}
+    assert doc["checks"] == {"activationLock": "OFF", "diskEncryption": "OFF", "osDiskHealth": "OK",
+                             "securityProtection": "ON"}
 
 
 def test_FileVault가_켜져_있으면_경고하고_못_읽으면_모름이다():
@@ -53,7 +55,8 @@ def test_OS가_본_SSD_SMART가_Verified가_아니면_경고한다():
 
 
 def test_잠금_상태를_못_읽으면_올리는_checks는_모두_null이다():
-    failed = {cmd: Output(cmd, None, "", "명령 없음") for cmd in (macos.HARDWARE, macos.FILEVAULT, macos.NVME)}
+    failed = {cmd: Output(cmd, None, "", "명령 없음")
+              for cmd in (macos.HARDWARE, macos.FILEVAULT, macos.NVME, macos.GATEKEEPER, macos.SIP)}
     collected = macos.collect(FixtureRunner(failed))
     doc = _doc(collected)
     assert doc["checks"] == {"activationLock": None, "diskEncryption": None, "osDiskHealth": None}
@@ -105,7 +108,7 @@ def test_BitLocker가_켜져_있으면_경고하고_관리자_권한이_없으�
     checks = windows.collect(WinRunner({windows.BITLOCKER: on}))["checks"]
     assert checks["bitLocker"] == "켜짐" and len(checks["warnings"]) == 1
     denied = windows.collect(WinRunner())["checks"]  # 고정 파일 없음 = 권한 없음과 같다
-    assert denied == {"bitLocker": None, "warnings": []}
+    assert denied == {"bitLocker": None, "security": None, "threatCount": None, "warnings": []}
     assert "BitLocker 모름" in report.summary(_doc(windows.collect(WinRunner())), denied)
 
 
@@ -119,6 +122,6 @@ def test_동의_전_요약에_올라가는_부품_시리얼과_부품_번호가_
 def test_BitLocker_상태가_알_수_없음이나_빈_값이면_꺼짐이_아니라_모름이다():
     for status in (2, None):
         out = Output(windows.BITLOCKER, 0, json.dumps([{"DriveLetter": "C:", "ProtectionStatus": status}]))
-        assert windows.collect(WinRunner({windows.BITLOCKER: out}))["checks"] == {"bitLocker": None, "warnings": []}
+        assert windows.collect(WinRunner({windows.BITLOCKER: out}))["checks"]["bitLocker"] is None
     off = Output(windows.BITLOCKER, 0, json.dumps([{"DriveLetter": "C:", "ProtectionStatus": 0}]))
     assert windows.collect(WinRunner({windows.BITLOCKER: off}))["checks"]["bitLocker"] == "꺼짐"

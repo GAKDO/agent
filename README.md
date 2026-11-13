@@ -23,9 +23,9 @@ smartctl을 받지 않으려면 `curl -fsSL https://gakdo.site/agent.sh | TRACE_
 ```
 
 - 스크립트: `install/agent.sh`, `install/agent.ps1`. 소스는 `~/.trace-agent`(Windows는 `%LOCALAPPDATA%\trace-agent`)에 풀리고 진단 JSON도 거기 남는다
-- `/agent.sh`·`/agent.ps1`은 web nginx가 `raw.githubusercontent.com/GAKDO/agent/v0.2.0/install/...`로 302 넘긴다
+- `/agent.sh`는 `raw.githubusercontent.com/GAKDO/agent/v0.3.0/install/agent.sh`로, `/agent.ps1`은 `.../v0.2.0/install/agent.ps1`로 web nginx가 302 넘긴다
 - 다른 서버로 올릴 때: `curl -fsSL <화면>/agent.sh | TRACE_API_URL=<API 주소> sh -s 123456`(변수는 `sh` 쪽에 붙인다)
-- 환경 변수: `TRACE_API_URL`, `TRACE_AGENT_REF`(받을 브랜치나 태그, 기본 `v0.2.0`. 최신 개발본을 받으려면 `develop`), `TRACE_AGENT_HOME`, `TRACE_AGENT_SRC`, `TRACE_AGENT_PYTHON_URL`
+- 환경 변수: `TRACE_API_URL`, `TRACE_AGENT_REF`(받을 브랜치나 태그, 기본 맥 `v0.3.0`·Windows `v0.2.0`. 최신 개발본을 받으려면 `develop`), `TRACE_AGENT_HOME`, `TRACE_AGENT_SRC`, `TRACE_AGENT_PYTHON_URL`
 
 ## 실행 (macOS)
 
@@ -39,6 +39,7 @@ trace-agent upload --code 123456   # 올리지 못했을 때: 남긴 JSON을 새
 ```
 
 - 요약 끝의 `잠금`·`[주의]` 줄은 반납·출고 때 직원이 바로 볼 경고다. 활성화 잠금(나의 Mac 찾기)·FileVault·BitLocker가 켜져 있으면 초기화 전에 고객에게 해제를 요청한다. 같은 상태가 진단 JSON `checks`(ON·OFF·OK·WARNING 코드, contracts 11/7 추가)로 함께 올라가고, diagnostics-server가 켜짐·경고에 점검 플래그를 붙인다
+- 요약의 `보안 보호` 줄(11/12 추가)은 Windows Microsoft Defender 백신·실시간 보호, macOS Gatekeeper·SIP가 켜졌는지와 Defender 위협 탐지 **건수**만 보인다. 위협 상세(파일 경로)·설치 프로그램 목록은 읽지 않는다. 읽은 값만 진단 JSON `checks.securityProtection`·`threatCount`로 올라가고, 서버가 꺼짐·새 위협에 점검 플래그를 붙인다
 
 - 전원 어댑터를 꽂아야 벤치마크(약 1분)를 돌린다. 꽂지 않았으면 벤치마크 전에 묻는다: 충전기를 꽂고 Enter를 누르면 다시 확인해 돌리고, `n`이면(또는 세 번 확인해도 없으면) 벤치마크 없이 사유(NO_AC_POWER)만 남긴다.
 - 읽는 명령은 `src/trace_agent/commands.py`의 `ALLOWED` 목록뿐이다. 사용자 파일·브라우저 기록은 읽지 않고, 컴퓨터 이름·플랫폼 UUID는 보내지 않는다.
