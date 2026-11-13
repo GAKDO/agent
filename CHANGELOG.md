@@ -6,8 +6,16 @@ main에 버전이 적힌 CHANGELOG가 올라가면 release.yml이 태그와 GitH
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-13
+
+**목표: 반납 점검에 보안 보호(Windows Defender, macOS Gatekeeper·SIP) 상태를 함께 올림**
+맥 한 줄 설치(`gakdo.site/agent.sh`)가 받는 기본 태그를 `v0.3.0`으로 올린다.
+
 ### 추가
-- 보안 상태 점검(11/12, 사업단·기자재 담당자 설문 반영): Windows Microsoft Defender 백신·실시간 보호와 위협 탐지 건수, macOS Gatekeeper·SIP 켜짐 여부를 고정 명령 4개로 읽어 요약에 보이고 진단 JSON `checks.securityProtection`·`threatCount`(contracts #46)로 올린다. 위협 상세·설치 프로그램 목록은 읽지 않는다
+- 보안 상태 점검(11/12, 사업단·기자재 담당자 설문 반영): Windows Microsoft Defender 백신·실시간 보호와 위협 탐지 건수, macOS Gatekeeper·SIP 켜짐 여부를 고정 명령 4개로 읽어 요약에 보이고 진단 JSON `checks.securityProtection`·`threatCount`(contracts #46)로 올린다. 위협 상세·설치 프로그램 목록은 읽지 않는다 (#15)
+
+### 바꿈
+- 맥 한 줄 설치(`agent.sh`) 기본 ref를 `v0.2.0`에서 `v0.3.0`으로 올림. Windows(`agent.ps1`)는 시연 고정을 위해 `v0.2.0` 그대로 둔다
 
 ## [0.2.0] - 2026-11-11
 
