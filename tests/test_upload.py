@@ -83,6 +83,7 @@ def test_y를_넣으면_페어링_교환_뒤_Idempotency_Key와_함께_올리고
 
 # [상황] 서버가 "이미 올린 진단"(409)으로 거절한다.
 # [기대] 오류 코드를 보여 주고 실패(1)로 끝나며, 진단 JSON은 파일로 남겨 둔다.
+#        ※ 응답 코드: 409 = 지금 상태와 맞지 않아 거절(이미 있음·순서 어긋남 등)
 def test_서버가_409나_422를_주면_code를_보여_주고_1로_끝나며_JSON을_파일로_남긴다(tmp_path, capsys):
     server = FakeServer(409, {"code": "DIAGNOSTIC_ALREADY_UPLOADED", "detail": "이미 올림"})
     assert run_cli(server, "y", tmp_path) == 1
@@ -122,6 +123,7 @@ def test_전원이_없으면_명령줄에서도_벤치마크를_돌리지_않는
 
 
 # 가짜 서버: 첫 페어링 교환은 "3초 뒤 다시"(429)로 막고, 다음부터 받아 준다. 교환 응답에 그 렌탈 기기 일련번호를 준다.
+# ※ 응답 코드: 429 = 요청이 너무 잦아 잠시 막음
 class RateLimitedServer(FakeServer):
     """처음 교환은 429(Retry-After 3)로 막고, 그다음부터 받아 준다. 교환 응답에 기기 시리얼을 준다."""
 
@@ -147,6 +149,7 @@ def _cli(server, tmp_path, slept: list, argv: list[str] | None = None) -> int:
 
 # [상황] 페어링 교환이 요청 제한(429, 3초 뒤 다시)에 걸린다.
 # [기대] 3초 기다렸다가 다시 교환하고 진단을 올린다.
+#        ※ 응답 코드: 429 = 요청이 너무 잦아 잠시 막음
 def test_교환이_429면_Retry_After만큼_기다렸다_다시_시도해_올린다(tmp_path):
     slept: list[float] = []
     server = RateLimitedServer()
@@ -168,6 +171,7 @@ def test_페어링_코드의_기기와_시리얼이_다르면_올리지_않고_�
 # [상황] 서버 점검(503)으로 올리기에 실패한 뒤, 나중에 "trace-agent upload"로 다시 올린다.
 # [기대] 실패 때 진단 파일과 중복 방지 키를 남기고 다시 올리는 방법을 안내한다.
 #        다시 올릴 때는 같은 키·같은 내용으로 보내 서버에 두 번 저장되지 않게 하고, 성공하면 키 파일을 지운다.
+#        ※ 응답 코드: 503 = 서버를 지금 쓸 수 없음(점검·장애)
 def test_올리지_못하면_JSON과_키를_남기고_upload_명령은_같은_키와_같은_내용으로_다시_올린다(tmp_path, capsys):
     first = FakeServer(503, {"code": "UNAVAILABLE"})
     assert run_cli(first, "y", tmp_path) == 1
@@ -324,6 +328,7 @@ def test_저장이_실패해도_기존_진단_JSON은_그대로_남는다(tmp_pa
 
 # [상황] 503 오류 응답 본문이 깨진 글자다.
 # [기대] 본문은 빈 것으로 보고 상태 코드 503만 돌려준다.
+#        ※ 응답 코드: 503 = 서버를 지금 쓸 수 없음(점검·장애)
 def test_잘못_인코딩된_오류_응답은_빈_본문으로_읽는다(monkeypatch):
     import io
     import urllib.error
@@ -364,6 +369,7 @@ def test_응답이_Content_Length보다_일찍_끝나면_UploadError로_바꾼�
 
 # [상황] 서버가 다른 주소(evil.test)로 가라고 302 리디렉션한다.
 # [기대] 따라가지 않아 토큰이 다른 곳으로 가지 않는다.
+#        ※ 응답 코드: 302 = 다른 주소로 가라는 안내(리디렉션)
 def test_리다이렉트는_따라가지_않아_토큰이_다른_곳으로_가지_않는다():
     import urllib.request
 

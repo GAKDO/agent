@@ -30,6 +30,7 @@ RENTAL = {
 
 # 가짜 TRACE gateway. 로그인하면 토큰을 주고, 리프레시 쿠키가 맞으면 새 토큰으로 바꿔 준다.
 # 토큰이 맞으면 렌탈·검사 결과를 주고, 출고 진단은 "없음(404)"으로 답한다.
+# ※ 응답 코드: 404 = 찾을 수 없음(없는 주소나 데이터)
 class FakeGateway:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, dict[str, str]]] = []
@@ -150,6 +151,7 @@ def test_MCP_서버는_읽기_전용_도구_7개를_노출한다(client: TraceCl
 
 # [상황] 토큰 재발급 중 서버가 잠깐 503(점검 중)으로 답한다.
 # [기대] "로그인 만료"로 잘못 알리지 않고 그 오류(UNAVAILABLE)를 그대로 알린다.
+#        ※ 응답 코드: 503 = 서버를 지금 쓸 수 없음(점검·장애)
 def test_리프레시가_일시_오류면_만료가_아니라_그_오류를_알린다(client: TraceClient, gw: FakeGateway) -> None:
     sess.save(client.path, sess.Session("old", "refresh-1"))
     real = gw.__call__
@@ -181,6 +183,7 @@ def test_로그아웃은_서버_호출이_실패해도_로컬_세션을_지운�
 
 # [상황] 서버 응답이 "다른 주소(evil.example)로 가라"는 302 리디렉션이다.
 # [기대] 따라가지 않는다. 그래서 로그인 토큰이 엉뚱한 곳으로 보내지지 않는다.
+#        ※ 응답 코드: 302 = 다른 주소로 가라는 안내(리디렉션)
 def test_리디렉션은_따라가지_않아_토큰이_다른_주소로_가지_않는다() -> None:
     import email.message
     import io
