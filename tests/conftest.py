@@ -1,6 +1,7 @@
-# 테스트 공통 준비물(테스트 자체는 아님): 진단 에이전트가 맥에서 실행하는 명령(system_profiler·ioreg·pmset 등)의
-# 출력을 진짜로 실행하지 않고, 실제 맥북 에어(M2)에서 미리 받아 둔 출력 파일(tests/fixtures/macos)로 돌려준다.
-# 그래서 어떤 컴퓨터(리눅스 CI 포함)에서도 "그 맥북에서 진단을 돌린 것처럼" 시험할 수 있다.
+"""테스트 공통 준비물(테스트 자체는 아님): 진단 에이전트가 맥에서 실행하는 명령(system_profiler·ioreg·pmset 등)의
+출력을 진짜로 실행하지 않고, 실제 맥북 에어(M2)에서 미리 받아 둔 출력 파일(tests/fixtures/macos)로 돌려준다.
+그래서 어떤 컴퓨터(리눅스 CI 포함)에서도 "그 맥북에서 진단을 돌린 것처럼" 시험할 수 있다.
+"""
 
 from __future__ import annotations
 
@@ -54,4 +55,5 @@ class FixtureRunner:
 
 @pytest.fixture
 def runner() -> FixtureRunner:
+    """맥 진단 명령(system_profiler·ioreg·pmset 등)에 실제 맥북 에어(M2)에서 받아 둔 출력을 돌려주는 가짜 실행기."""
     return FixtureRunner()

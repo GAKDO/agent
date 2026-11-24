@@ -71,6 +71,18 @@ trace-agent run
 python -m ruff check . && python -m pytest
 ```
 
+진단 수집은 실제 명령 대신 고정 출력 파일(`tests/fixtures/`)로 시험하므로 어느 OS에서든 돕니다. 다만 **전체가 다 도는 곳은 Linux**뿐이고,
+아래는 OS나 설치 상태에 따라 건너뜁니다(CI는 ubuntu·macos·windows 세 곳에서 돌려 서로 빈 곳을 채웁니다).
+
+| 테스트 | 건너뛰는 조건 | 까닭 |
+|---|---|---|
+| `tests/test_install.py` 전체(한 줄 설치 스크립트) | Windows, 또는 `sh`가 없을 때 | `agent.sh`는 POSIX sh 스크립트 |
+| `test_install.py`의 실제 설치·실행 3개 | Linux가 아닐 때 | 맥에서는 진짜 수집·벤치마크가 돌아 오래 걸림 |
+| `test_install.py`의 smartctl 설치 1개 | macOS가 아닐 때, 또는 이미 smartctl이 있을 때 | `hdiutil`·`pkgutil`은 맥에만 있음 |
+| `tests/test_mcp.py`의 도구 목록 1개 | `mcp` 패키지가 없을 때 | CI는 `.[dev]`만 깔아 여기서도 건너뜀. `pip install -e ".[dev,mcp]"`로 켬 |
+
+테스트 파일마다 맨 위 설명(docstring)에 무엇을 확인하는지, 테스트마다 `[상황]`·`[기대]`를 적어 두었습니다.
+
 ## CI
 
 | 워크플로 | 언제 | 하는 일 |
