@@ -1,8 +1,9 @@
-# 이 파일이 확인하는 것: 윈도우 진단 수집(요구사항 AG2).
-# 실제 LG 그램·갤럭시 북에서 받아 둔 PowerShell 명령 출력(tests/fixtures/windows)으로 배터리·SSD·부품·
-# 측정 조건을 읽고, 명령이 실패하거나 권한이 없을 때 어떻게 대신하는지 본다.
+"""이 파일이 확인하는 것: 윈도우 진단 수집(요구사항 AG2).
+실제 LG 그램·갤럭시 북에서 받아 둔 PowerShell 명령 출력(tests/fixtures/windows)으로 배터리·SSD·부품·
+측정 조건을 읽고, 명령이 실패하거나 권한이 없을 때 어떻게 대신하는지 본다.
 
-"""AG2 수용 시나리오: Windows 명령 출력 고정 파일(tests/fixtures/windows)로 확인."""
+AG2 수용 시나리오: Windows 명령 출력 고정 파일(tests/fixtures/windows)로 확인.
+"""
 
 from __future__ import annotations
 
