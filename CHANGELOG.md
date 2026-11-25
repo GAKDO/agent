@@ -6,6 +6,9 @@ main에 버전이 적힌 CHANGELOG가 올라가면 release.yml이 태그와 GitH
 
 ## [Unreleased]
 
+### 바꿈
+- CI(python-ci)에서 pytest 커버리지를 재고 70% 아래면 실패하게 했다. (ubuntu에서만 잰다).
+
 ## [0.3.0] - 2026-11-13
 
 **목표: 반납 점검에 보안 보호(Windows Defender, macOS Gatekeeper·SIP) 상태를 함께 올림**
